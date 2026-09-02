@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+ENV/
+
+# Test / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Savegames / Logs
+*.save
+*.log
