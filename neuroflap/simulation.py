@@ -121,28 +121,31 @@ def main() -> None:
     renderer = Renderer()
     sim = Simulation()
     speed = 2
-    paused = False
+    active = True   # Simulation startet eingeschaltet
     running = True
 
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if renderer.toggle_rect.collidepoint(event.pos):
+                    active = not active
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif event.key == pygame.K_p:
-                    paused = not paused
+                elif event.key in (pygame.K_SPACE, pygame.K_p):
+                    active = not active
                 elif event.key == pygame.K_r:
                     sim = Simulation()
                 elif event.key in speeds:
                     speed = speeds[event.key]
 
-        if not paused:
+        if active:
             for _ in range(speed):
                 sim.step()
 
-        renderer.render(sim, speed)
+        renderer.render(sim, speed, active)
         renderer.clock.tick(config.FPS)
 
     pygame.quit()

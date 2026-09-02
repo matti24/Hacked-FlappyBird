@@ -39,7 +39,7 @@ sie haben es sich selbst beigebracht.**
 | Taste | Aktion |
 | --- | --- |
 | `1` – `5` | Tempo (1× / 2× / 4× / 8× / 30×) |
-| `P` | Pause |
+| Klick auf den Schalter / `Leertaste` / `P` | Simulation an/aus (startet eingeschaltet) |
 | `R` | Reset – neue, zufällige Population |
 | `Esc` | Beenden |
 
