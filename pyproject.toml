@@ -1,7 +1,7 @@
 [project]
-name = "dark-depths"
+name = "neuroflap"
 version = "1.0.0"
-description = "Dark Depths – ein prozedurales Roguelike mit smarter Gegner-KI (pygame)"
+description = "NeuroFlap – eine KI lernt per Neuroevolution Flappy Bird zu spielen (from scratch)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -9,12 +9,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
-dark-depths = "roguelike.game:main"
+neuroflap = "neuroflap.simulation:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

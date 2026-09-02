@@ -1,101 +1,111 @@
-# 🗡️ Dark Depths
+# 🧠🐦 NeuroFlap
 
-Ein prozedurales Roguelike mit **smarter Gegner-KI**, geschrieben in Python mit `pygame-ce`.
-Jeder Abstieg erzeugt einen neuen Dungeon – erkunde ihn, kämpfe gegen Kobolde, Orks und Trolle
-und steige so tief wie möglich hinab.
+Eine **KI, die sich vor deinen Augen selbst das Spielen beibringt.** Eine Population von
+150 Vögeln lernt per **Neuroevolution** Flappy Bird zu meistern – neuronale Netze **und**
+der genetische Algorithmus sind komplett *from scratch* implementiert, ganz ohne
+ML-Bibliothek. Nur `pygame` für die Darstellung.
 
 ![Vorschau](docs/preview.png)
 
+## 🚀 Der Wow-Moment
+
+Du startest, und **alle Vögel sind hilflos** – sie stürzen sofort ab. Doch mit jeder
+Generation werden die Netze besser. Nach wenigen Generationen kippt es plötzlich:
+
+```
+Generation  1: beste Fitness   445   bester Score  2
+Generation  6: beste Fitness   726   bester Score  4
+Generation  7: beste Fitness  1475   bester Score 10
+Generation  8: beste Fitness  6263   bester Score 48   ← Durchbruch!
+```
+
+Ab hier fliegen die besten Vögel praktisch endlos. **Niemand hat ihnen gezeigt, wie –
+sie haben es sich selbst beigebracht.**
+
 ## ✨ Features
 
-- **Prozedural generierte Dungeons** – zufällige Räume, mit Gängen verbunden; jeder Durchlauf ist neu.
-- **Smarte Gegner-KI** – Zustandsautomat (*wandern → verfolgen → angreifen*) mit
-  A*-Wegfindung und Sichtlinien-Prüfung. Gegner **merken sich die zuletzt bekannte
-  Position** und suchen dich noch einige Runden, nachdem sie dich aus den Augen verloren haben.
-- **Field of View / Fog of War** – Recursive Shadowcasting: du siehst nur, was im Licht liegt;
-  erkundete Bereiche bleiben abgedunkelt sichtbar.
-- **Rundenbasierter Kampf** – Angriff/Verteidigung, verschiedene Gegnertypen, Heiltränke.
-- **Mehrere Ebenen** – steige über Treppen (`>`) tiefer; Gegner werden gefährlicher.
-- **Permadeath** – ein Leben, ein Lauf. Erreiche Ebene 8, um zu gewinnen.
+- **Neuronales Netz from scratch** – Feedforward-Netz (5 → 8 → 1) mit tanh/sigmoid,
+  komplett in reinem Python ([`neural_net.py`](neuroflap/neural_net.py)).
+- **Genetischer Algorithmus** – Turnier-Selektion, Uniform-Crossover, gaußsche Mutation,
+  Elitismus ([`genetic.py`](neuroflap/genetic.py)).
+- **Live-Visualisierung des besten Gehirns** – Neuronen und gewichtete Verbindungen in
+  Echtzeit (cyan = positiv, rot = negativ), aktive Neuronen leuchten.
+- **Fitness-Graph** – die beste Fitness pro Generation als Lernkurve.
+- **Schwarm-Ansicht** – alle 150 Vögel gleichzeitig; der aktuelle Anführer ist golden.
+- **Zeitraffer** – Tempo bis 30× hochdrehen, um das Lernen im Schnelldurchlauf zu sehen.
 
 ## 🎮 Steuerung
 
 | Taste | Aktion |
 | --- | --- |
-| `W` `A` `S` `D` / Pfeiltasten / `H` `J` `K` `L` | Bewegen & angreifen |
-| `Q` | Heiltrank trinken |
-| `>` `.` / Enter | Treppe hinabsteigen (auf `>` stehend) |
-| `R` | Neustart (nach Spielende) |
+| `1` – `5` | Tempo (1× / 2× / 4× / 8× / 30×) |
+| `P` | Pause |
+| `R` | Reset – neue, zufällige Population |
 | `Esc` | Beenden |
 
-**Symbole:** `@` Held · `g` Kobold · `o` Ork · `T` Troll · `!` Heiltrank · `>` Treppe
+## 🧬 Wie es funktioniert
 
-## 🚀 Installation & Start
+Jeder Vogel wird von einem eigenen kleinen neuronalen Netz gesteuert. Es erhält fünf
+normalisierte Eingaben und entscheidet pro Frame, ob geflattert wird:
+
+1. Höhe des Vogels
+2. Vertikale Geschwindigkeit
+3. Horizontale Distanz zur nächsten Röhre
+4. Abstand zur oberen Lückenkante
+5. Abstand zur unteren Lückenkante
+
+**Fitness** = Überlebenszeit + Bonus je passierter Röhre. Sind alle Vögel gestorben,
+bildet der genetische Algorithmus die nächste Generation:
+
+```
+Beste behalten (Elite)  ──►  Turnier-Selektion der Eltern
+                                     │
+                            Uniform-Crossover
+                                     │
+                              Mutation  ──►  neue Generation
+```
+
+So verbessert sich die Population über die Generationen – ganz ohne Backpropagation.
+
+## 🛠️ Installation & Start
 
 ```bash
-# Repository klonen
 git clone <DEIN-REPO-URL>
-cd dark-depths
+cd neuroflap
 
-# (empfohlen) virtuelle Umgebung
 python -m venv .venv
 # Windows:
 .venv\Scripts\activate
 # macOS/Linux:
 source .venv/bin/activate
 
-# Abhängigkeiten installieren
 pip install -r requirements.txt
-
-# Spiel starten
 python main.py
 ```
 
 > Benötigt **Python 3.10+**.
 
-## 🧠 Wie die Gegner-KI funktioniert
-
-Jeder Gegner ist ein kleiner Zustandsautomat ([`roguelike/ai.py`](roguelike/ai.py)):
-
-```
-        sieht Spieler                benachbart
- WANDER ────────────► CHASE ──────────────────► ANGRIFF
-   ▲                    │
-   │  Erinnerung        │ Spieler außer Sicht
-   └────────────────────┘ (verfolgt letzte bekannte Position
-        Erinnerung = 0      noch ENEMY_MEMORY_TURNS Runden)
-```
-
-- **Sichtprüfung:** Distanz + Bresenham-Sichtlinie (keine Wand dazwischen).
-- **Verfolgung:** A*-Wegfindung ([`roguelike/pathfinding.py`](roguelike/pathfinding.py)) zur
-  Spielerposition; blockierte Felder anderer Gegner werden umgangen.
-- **Gedächtnis:** Verliert ein Gegner die Sicht, jagt er die zuletzt bekannte Position –
-  du kannst also um Ecken entkommen, aber nicht sofort.
-
 ## 🗂️ Projektstruktur
 
 ```
-dark-depths/
-├── main.py                  # Einstiegspunkt
-├── roguelike/
-│   ├── config.py            # Größen, Farben, Tuning
-│   ├── game.py              # Spielzustand, Rundenlogik, Hauptschleife
-│   ├── game_map.py          # Tiles & Raster
-│   ├── procgen.py           # prozedurale Dungeon-Generierung
-│   ├── fov.py               # Field of View (Shadowcasting)
-│   ├── pathfinding.py       # A*-Wegfindung
-│   ├── ai.py                # Gegner-KI (Zustandsautomat)
-│   ├── entities.py          # Spieler, Monster, Items
-│   ├── combat.py            # Kampfauflösung
-│   └── renderer.py          # Darstellung (pygame)
-├── tests/                   # pytest-Suite (Logik ohne Fenster testbar)
+neuroflap/
+├── main.py                 # Einstiegspunkt
+├── neuroflap/
+│   ├── config.py           # Fenster, Physik, Evolution, Farben
+│   ├── neural_net.py       # Feedforward-Netz (from scratch)
+│   ├── genetic.py          # Selektion, Crossover, Mutation
+│   ├── bird.py             # Vogel-Physik + Netz-Steuerung
+│   ├── pipe.py             # Röhren
+│   ├── population.py       # Population & Evolution
+│   ├── simulation.py       # Physik, Fitness, Hauptschleife
+│   └── renderer.py         # Darstellung + Netz-Visualisierung
+├── tests/                  # pytest-Suite (läuft ohne Fenster)
 ├── requirements.txt
 └── pyproject.toml
 ```
 
-Die **Spiellogik ist bewusst von der Darstellung getrennt**: alle Kernmodule
-(`procgen`, `fov`, `pathfinding`, `ai`, `combat`, `game`) kommen ohne pygame aus und
-sind dadurch vollständig headless testbar.
+Die gesamte KI- und Simulationslogik ist von der Darstellung getrennt und damit
+**vollständig headless testbar**.
 
 ## 🧪 Tests
 
@@ -104,7 +114,8 @@ pip install pytest
 pytest
 ```
 
-Die Suite deckt Dungeon-Generierung, Wegfindung, Sichtfeld, Kampf und KI-Verhalten ab.
+Getestet werden das neuronale Netz (Forward-Pass, Genom-Roundtrip), die genetischen
+Operatoren und die Simulation (Evolution, Kollision, Population).
 
 ## 📜 Lizenz
 
