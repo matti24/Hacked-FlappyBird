@@ -6,21 +6,22 @@ from . import config
 
 
 class Pipe:
-    def __init__(self, x: float, gap_y: float) -> None:
+    def __init__(self, x: float, gap_y: float, gap_size: float | None = None) -> None:
         self.x = x
-        self.gap_y = gap_y      # vertikale Mitte der Lücke
-        self.scored = False     # wurde diese Röhre bereits gezählt?
+        self.gap_y = gap_y                    # vertikale Mitte der Lücke
+        self.gap_size = gap_size if gap_size is not None else config.PIPE_GAP
+        self.scored = False                   # wurde diese Röhre bereits gezählt?
 
     @property
     def gap_top(self) -> float:
-        return self.gap_y - config.PIPE_GAP / 2
+        return self.gap_y - self.gap_size / 2
 
     @property
     def gap_bottom(self) -> float:
-        return self.gap_y + config.PIPE_GAP / 2
+        return self.gap_y + self.gap_size / 2
 
-    def update(self) -> None:
-        self.x -= config.PIPE_SPEED
+    def update(self, speed: float = config.PIPE_SPEED) -> None:
+        self.x -= speed
 
     def is_offscreen(self) -> bool:
         return self.x + config.PIPE_WIDTH < 0

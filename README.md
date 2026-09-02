@@ -32,15 +32,22 @@ sie haben es sich selbst beigebracht.**
   Echtzeit (cyan = positiv, rot = negativ), aktive Neuronen leuchten.
 - **Fitness-Graph** – die beste Fitness pro Generation als Lernkurve.
 - **Schwarm-Ansicht** – alle 150 Vögel gleichzeitig; der aktuelle Anführer ist golden.
+- **Selbst spielen** – per Umschalter in den Mensch-Modus wechseln und direkt gegen den
+  KI-Bestwert antreten. („So schwer ist es – schaffst du mehr als die KI?")
+- **Progressive Schwierigkeit** – mit steigendem Score wird die Lücke enger und das Tempo
+  höher. Die KI passt sich per Evolution an und meistert selbst das schwerste Regime.
+- **Atmosphärischer Hintergrund** – Parallax-Bergketten, leuchtender Mond, funkelnde Sterne.
 - **Zeitraffer** – Tempo bis 30× hochdrehen, um das Lernen im Schnelldurchlauf zu sehen.
 
 ## 🎮 Steuerung
 
 | Taste | Aktion |
 | --- | --- |
-| `1` – `5` | Tempo (1× / 2× / 4× / 8× / 30×) |
-| Klick auf den Schalter / `Leertaste` / `P` | Simulation an/aus (startet eingeschaltet) |
-| `R` | Reset – neue, zufällige Population |
+| `M` / Klick auf den Umschalter | Zwischen **KI-Training** und **Selbst spielen** wechseln |
+| `Leertaste` / Klick | Im Mensch-Modus: fliegen (bzw. neuer Versuch nach Game Over) |
+| `1` – `5` | Simulationstempo im KI-Modus (1× / 2× / 4× / 8× / 30×) |
+| Klick auf den Schalter / `Leertaste` / `P` | Simulation an/aus im KI-Modus (startet eingeschaltet) |
+| `R` | Reset (neue Population bzw. neuer Versuch) |
 | `Esc` | Beenden |
 
 ## 🧬 Wie es funktioniert

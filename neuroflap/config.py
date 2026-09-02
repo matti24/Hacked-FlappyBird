@@ -14,12 +14,16 @@ GRAVITY = 0.45
 FLAP_STRENGTH = -8.2
 MAX_FALL_SPEED = 12.0
 
-# --- Röhren ---
+# --- Röhren & Schwierigkeit ---
 PIPE_WIDTH = 74
-PIPE_GAP = 180
-PIPE_SPEED = 3.2
-PIPE_SPACING = 330       # horizontaler Abstand zwischen zwei Röhren
-PIPE_MIN_MARGIN = 70     # Mindestabstand der Lücke zu oben/unten
+PIPE_GAP = 190               # Start-Lückengröße (leicht)
+PIPE_GAP_MIN = 140           # kleinste Lücke bei hohem Score
+PIPE_SPEED = 3.0             # Grundtempo
+PIPE_SPEED_MAX_BONUS = 2.6   # maximaler Tempo-Zuschlag
+PIPE_SPACING = 330           # horizontaler Abstand zwischen zwei Röhren
+PIPE_MIN_MARGIN = 70         # Mindestabstand der Lücke zu oben/unten
+DIFF_GAP_PER_SCORE = 2.5     # Lücke verkleinert sich je Punkt
+DIFF_SPEED_PER_SCORE = 0.06  # Tempo steigt je Punkt
 
 # --- Neuronales Netz ---
 INPUT_SIZE = 5
@@ -72,3 +76,15 @@ COLOR_TOGGLE_ON = (80, 210, 140)
 COLOR_TOGGLE_OFF = (70, 74, 104)
 COLOR_TOGGLE_KNOB = (240, 244, 255)
 COLOR_CARD_BG = (20, 23, 42)
+
+# Landschaft (Parallax-Berge + Mond)
+COLOR_MOUNTAIN_FAR = (30, 30, 58)
+COLOR_MOUNTAIN_MID = (26, 40, 70)
+COLOR_MOUNTAIN_NEAR = (18, 20, 40)
+COLOR_MOON = (238, 234, 214)
+COLOR_MOON_GLOW = (120, 132, 200)
+
+# Spieler (Mensch-Modus)
+COLOR_PLAYER = (120, 235, 255)
+COLOR_MODE_ACTIVE = (150, 120, 240)
+COLOR_MODE_INACTIVE = (44, 48, 78)
