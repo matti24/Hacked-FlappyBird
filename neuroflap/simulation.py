@@ -210,7 +210,7 @@ async def main() -> None:
 
     renderer = Renderer()
     sim = Simulation()
-    speed = 2
+    speed = 1
     active = True
     running = True
 

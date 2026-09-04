@@ -44,24 +44,25 @@ class NeuralNetwork:
         self.last_output: list[float] = [0.0] * output_size
 
     def forward(self, inputs: list[float]) -> list[float]:
-        self.last_input = list(inputs)
+        self.last_input = inputs
 
-        hidden = []
-        for j in range(self.hidden_size):
-            total = self.b1[j]
-            row = self.w1[j]
-            for i in range(self.input_size):
-                total += row[i] * inputs[i]
-            hidden.append(math.tanh(total))
+        tanh = math.tanh
+        hidden: list[float] = []
+        append = hidden.append
+        for row, bias in zip(self.w1, self.b1):
+            total = bias
+            for w, x in zip(row, inputs):
+                total += w * x
+            append(tanh(total))
         self.last_hidden = hidden
 
-        outputs = []
-        for k in range(self.output_size):
-            total = self.b2[k]
-            row = self.w2[k]
-            for j in range(self.hidden_size):
-                total += row[j] * hidden[j]
-            outputs.append(_sigmoid(total))
+        outputs: list[float] = []
+        append = outputs.append
+        for row, bias in zip(self.w2, self.b2):
+            total = bias
+            for w, hj in zip(row, hidden):
+                total += w * hj
+            append(_sigmoid(total))
         self.last_output = outputs
         return outputs
 

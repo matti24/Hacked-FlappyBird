@@ -6,7 +6,6 @@ vorberechnet und pro Frame nur noch geblittet – das hält die FPS auch im Brow
 
 from __future__ import annotations
 
-import math
 import random
 import sys
 
@@ -50,6 +49,7 @@ class Renderer:
         self.font_stat = _make_font(30, bold=True)
         self.font_huge = _make_font(48, bold=True)
         self.font_label = _make_font(12)
+        self._text_cache: dict = {}
 
         # Vorberechnete Flächen (einmalig).
         self._sky = self._make_sky()
@@ -58,13 +58,6 @@ class Renderer:
         self._bird_best = self._make_bird_sprite(config.COLOR_BIRD_BEST, config.BIRD_RADIUS + 1)
         self._bird_player = self._make_bird_sprite(config.COLOR_PLAYER, config.BIRD_RADIUS + 1)
         self._trail_dots = self._make_trail_dots()
-
-        rng = random.Random(7)
-        self.stars = [
-            (rng.randint(0, config.GAME_WIDTH), rng.randint(0, int(config.HEIGHT * 0.72)),
-             rng.choice((1, 1, 1, 2)), rng.uniform(0, math.tau))
-            for _ in range(config.STAR_COUNT)
-        ]
 
         px = config.GAME_WIDTH + self.PAD
         pw = config.PANEL_WIDTH - 2 * self.PAD
@@ -83,6 +76,14 @@ class Renderer:
             f = y / h
             color = _lerp(top, mid, f / 0.55) if f < 0.55 else _lerp(mid, bot, (f - 0.55) / 0.45)
             pygame.draw.line(surf, color, (0, y), (config.GAME_WIDTH, y))
+        # Sterne einmalig einbacken (spart teure Draws pro Frame).
+        rng = random.Random(7)
+        for _ in range(config.STAR_COUNT):
+            sx = rng.randint(0, config.GAME_WIDTH)
+            sy = rng.randint(0, int(config.HEIGHT * 0.72))
+            size = rng.choice((1, 1, 1, 2))
+            shade = rng.randint(120, 210)
+            surf.fill((shade, shade, min(255, shade + 45)), (sx, sy, size, size))
         return surf
 
     def _make_pipe_texture(self) -> pygame.Surface:
@@ -134,8 +135,7 @@ class Renderer:
     # Haupt-Render
     # ------------------------------------------------------------------
     def render(self, sim, speed: int, active: bool = True) -> None:
-        t = pygame.time.get_ticks() / 1000.0
-        self._draw_world(t)
+        self._draw_world()
         self._draw_pipes(sim)
         self._draw_birds(sim)
         if sim.mode == "human" and sim.human_dead:
@@ -144,19 +144,24 @@ class Renderer:
         self._draw_fps()
         pygame.display.flip()
 
-    def _draw_world(self, t: float) -> None:
+    def _text(self, s: str, font, color) -> pygame.Surface:
+        # Glyphen-Rasterung ist teuer (v.a. WASM) -> statische Texte cachen.
+        key = (s, id(font), color)
+        surf = self._text_cache.get(key)
+        if surf is None:
+            surf = font.render(s, True, color)
+            self._text_cache[key] = surf
+        return surf
+
+    def _draw_world(self) -> None:
         self.screen.blit(self._sky, (0, 0))
-        for (sx, sy, size, phase) in self.stars:
-            tw = 0.55 + 0.45 * math.sin(t * 1.6 + phase)
-            shade = int(80 + 130 * tw)
-            self.screen.fill((shade, shade, min(255, shade + 45)), (sx, sy, size, size))
         gy = config.HEIGHT - 34
         self.screen.fill(config.COLOR_GROUND, (0, gy, config.GAME_WIDTH, 34))
         pygame.draw.line(self.screen, config.COLOR_GROUND_EDGE, (0, gy), (config.GAME_WIDTH, gy), 2)
 
     def _draw_fps(self) -> None:
         fps = self.clock.get_fps()
-        txt = self.font_label.render(f"{fps:.0f} FPS", True, config.COLOR_TEXT_DIM)
+        txt = self._text(f"{fps:.0f} FPS", self.font_label, config.COLOR_TEXT_DIM)
         self.screen.blit(txt, (config.GAME_WIDTH - txt.get_width() - 12, 10))
 
     def _draw_pipes(self, sim) -> None:
@@ -226,8 +231,8 @@ class Renderer:
         self.screen.fill(config.COLOR_PANEL_BG, (px, 0, config.PANEL_WIDTH, config.HEIGHT))
         pygame.draw.line(self.screen, config.COLOR_CARD_BORDER, (px, 0), (px, config.HEIGHT), 1)
 
-        self.screen.blit(self.font_big.render("NeuroFlap", True, config.COLOR_TEXT), (cx, 24))
-        self.screen.blit(self.font_small.render("Neuroevolution · KI lernt fliegen", True, config.COLOR_TEXT_DIM), (cx, 56))
+        self.screen.blit(self._text("NeuroFlap", self.font_big, config.COLOR_TEXT), (cx, 24))
+        self.screen.blit(self._text("Neuroevolution · KI lernt fliegen", self.font_small, config.COLOR_TEXT_DIM), (cx, 56))
 
         self._draw_mode_switch(cx, pw, sim.mode)
 
@@ -239,7 +244,7 @@ class Renderer:
         hint = ("Leertaste / Klick fliegen   ·   M: KI   ·   R: neu"
                 if sim.mode == "human"
                 else "M: selbst spielen   ·   Space: Pause   ·   1–5: Tempo   ·   R: Reset")
-        self.screen.blit(self.font_label.render(hint, True, config.COLOR_TEXT_DIM), (cx, config.HEIGHT - 26))
+        self.screen.blit(self._text(hint, self.font_label, config.COLOR_TEXT_DIM), (cx, config.HEIGHT - 26))
 
     def _draw_mode_switch(self, cx: int, pw: int, mode: str) -> None:
         card = pygame.Rect(cx, 92, pw, 36)
@@ -252,8 +257,8 @@ class Renderer:
         pygame.draw.rect(self.screen, config.COLOR_MODE_ACTIVE, active_rect, border_radius=8)
         ai_col = (10, 18, 30) if mode == "ai" else config.COLOR_TEXT_DIM
         hu_col = (10, 18, 30) if mode == "human" else config.COLOR_TEXT_DIM
-        a = self.font_small.render("KI-Training", True, ai_col)
-        h = self.font_small.render("Selbst spielen", True, hu_col)
+        a = self._text("KI-Training", self.font_small, ai_col)
+        h = self._text("Selbst spielen", self.font_small, hu_col)
         self.screen.blit(a, a.get_rect(center=ai_rect.center))
         self.screen.blit(h, h.get_rect(center=hu_rect.center))
 
@@ -275,8 +280,8 @@ class Renderer:
             ("Simulationstempo", f"{speed}×"),
         ]
         for label, value in rows:
-            self.screen.blit(self.font_small.render(label, True, config.COLOR_TEXT_DIM), (cx, y))
-            val = self.font.render(value, True, config.COLOR_TEXT)
+            self.screen.blit(self._text(label, self.font_small, config.COLOR_TEXT_DIM), (cx, y))
+            val = self._text(value, self.font, config.COLOR_TEXT)
             self.screen.blit(val, (cx + pw - val.get_width(), y - 1))
             y += 26
 
@@ -320,8 +325,8 @@ class Renderer:
     # ------------------------------------------------------------------
     def _stat_card(self, x: int, y: int, w: int, label: str, value: str, accent) -> None:
         pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, 72), border_radius=10)
-        self.screen.blit(self.font_label.render(label, True, config.COLOR_TEXT_DIM), (x + 12, y + 11))
-        self.screen.blit(self.font_stat.render(value, True, accent), (x + 12, y + 30))
+        self.screen.blit(self._text(label, self.font_label, config.COLOR_TEXT_DIM), (x + 12, y + 11))
+        self.screen.blit(self._text(value, self.font_stat, accent), (x + 12, y + 30))
 
     def _bar(self, x: int, y: int, w: int, frac: float, color) -> None:
         pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, 8), border_radius=4)
@@ -335,7 +340,7 @@ class Renderer:
         pygame.draw.rect(self.screen, config.COLOR_CARD_BG, card, border_radius=10)
         pygame.draw.rect(self.screen, config.COLOR_ACCENT_2 if active else config.COLOR_CARD_BORDER, card, 1, border_radius=10)
         label = "Simulation läuft" if active else "Pausiert"
-        self.screen.blit(self.font_small.render(label, True, config.COLOR_TEXT), (card.x + 14, card.y + 13))
+        self.screen.blit(self._text(label, self.font_small, config.COLOR_TEXT), (card.x + 14, card.y + 13))
         sw_w, sw_h = 44, 22
         sx = card.right - sw_w - 12
         sy = card.y + (card.height - sw_h) // 2
@@ -345,7 +350,7 @@ class Renderer:
 
     def _draw_network(self, sim, x: int, y: int, w: int, h: int) -> None:
         pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, h), border_radius=10)
-        self.screen.blit(self.font_label.render("GEHIRN DES ANFÜHRERS", True, config.COLOR_TEXT_DIM), (x + 12, y + 10))
+        self.screen.blit(self._text("GEHIRN DES ANFÜHRERS", self.font_label, config.COLOR_TEXT_DIM), (x + 12, y + 10))
         best = sim.population.best_alive()
         brain = best.brain if best is not None else None
         layers = (config.INPUT_SIZE, config.HIDDEN_SIZE, config.OUTPUT_SIZE)
@@ -383,7 +388,7 @@ class Renderer:
         if h < 46:
             return
         pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, h), border_radius=10)
-        self.screen.blit(self.font_label.render("FITNESS JE GENERATION", True, config.COLOR_TEXT_DIM), (x + 12, y + 10))
+        self.screen.blit(self._text("FITNESS JE GENERATION", self.font_label, config.COLOR_TEXT_DIM), (x + 12, y + 10))
         gx, gy = x + 12, y + 32
         gw, gh = w - 24, h - 44
         history = sim.population.fitness_history
@@ -392,10 +397,8 @@ class Renderer:
         peak = max(history) or 1.0
         n = len(history)
         points = [(gx + int(gw * (i / (n - 1))), gy + gh - int(gh * (v / peak))) for i, v in enumerate(history)]
-        fill = pygame.Surface((w, h), pygame.SRCALPHA)
-        poly = [(px_ - x, py_ - y) for px_, py_ in points] + [(points[-1][0] - x, gy + gh - y), (points[0][0] - x, gy + gh - y)]
-        pygame.draw.polygon(fill, (*config.COLOR_ACCENT, 45), poly)
-        self.screen.blit(fill, (x, y))
+        poly = points + [(points[-1][0], gy + gh), (points[0][0], gy + gh)]
+        pygame.draw.polygon(self.screen, config.COLOR_GRAPH_FILL, poly)
         pygame.draw.lines(self.screen, config.COLOR_ACCENT, False, points, 2)
 
     def _draw_game_over(self, sim) -> None:

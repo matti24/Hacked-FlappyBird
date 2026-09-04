@@ -31,8 +31,8 @@ HIDDEN_SIZE = 6
 OUTPUT_SIZE = 1
 
 # --- Evolution ---
-POPULATION_SIZE = 120
-ELITE_COUNT = 6          # beste Netze unverändert übernehmen
+POPULATION_SIZE = 35
+ELITE_COUNT = 5          # beste Netze unverändert übernehmen
 MUTATION_RATE = 0.18     # Wahrscheinlichkeit pro Gewicht
 MUTATION_STRENGTH = 0.4  # Streuung der Mutation
 FITNESS_PIPE_BONUS = 25.0    # Fitness-Bonus je passierter Röhre
@@ -75,6 +75,7 @@ COLOR_NODE = (51, 65, 85)
 COLOR_NODE_ON = (56, 189, 248)
 COLOR_EDGE_POS = (56, 189, 248)
 COLOR_EDGE_NEG = (244, 114, 130)
+COLOR_GRAPH_FILL = (26, 48, 78)      # solide Füllung des Fitness-Graphen
 
 # Toggle / Mode-Switch
 COLOR_TOGGLE_ON = (45, 212, 191)
