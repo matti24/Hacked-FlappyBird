@@ -1,4 +1,8 @@
-"""Darstellung: Landschafts-Hintergrund, KI-Schwarm, Mensch-Modus und Netz-Visualisierung."""
+"""Darstellung: cleaner, moderner Look mit performantem Rendering (Desktop & WASM).
+
+Alle teuren Flächen (Himmel-Verlauf, Röhren-Textur, Vogel-Sprites) werden einmal
+vorberechnet und pro Frame nur noch geblittet – das hält die FPS auch im Browser hoch.
+"""
 
 from __future__ import annotations
 
@@ -12,367 +16,398 @@ from . import config
 
 
 def _make_font(size: int, bold: bool = False) -> "pygame.font.Font":
-    # Im Browser (pygbag/WASM) gibt es keine Systemfonts -> eingebaute Font nutzen.
+    # Im Browser (pygbag/WASM) gibt es keine Systemfonts -> eingebaute Font.
     if sys.platform == "emscripten":
         return pygame.font.Font(None, size + 4)
-    return pygame.font.SysFont("consolas", size, bold=bold)
+    for name in ("Segoe UI", "segoeui", "Arial", "Helvetica"):
+        try:
+            font = pygame.font.SysFont(name, size, bold=bold)
+            if font:
+                return font
+        except Exception:
+            continue
+    return pygame.font.Font(None, size + 4)
+
+
+def _lerp(a, b, t: float):
+    return (int(a[0] + (b[0] - a[0]) * t),
+            int(a[1] + (b[1] - a[1]) * t),
+            int(a[2] + (b[2] - a[2]) * t))
 
 
 class Renderer:
+    PAD = 20
+
     def __init__(self) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
         pygame.display.set_caption("NeuroFlap – KI lernt fliegen")
         self.clock = pygame.time.Clock()
-        self.font = _make_font(18)
-        self.font_small = _make_font(15)
-        self.font_big = _make_font(30, bold=True)
-        self.font_huge = _make_font(54, bold=True)
-        self.font_label = _make_font(13)
 
-        self._bg = self._make_gradient()
+        self.font = _make_font(16)
+        self.font_small = _make_font(13)
+        self.font_big = _make_font(24, bold=True)
+        self.font_stat = _make_font(30, bold=True)
+        self.font_huge = _make_font(48, bold=True)
+        self.font_label = _make_font(12)
 
-        rng = random.Random(42)
+        # Vorberechnete Flächen (einmalig).
+        self._sky = self._make_sky()
+        self._pipe_tex = self._make_pipe_texture()
+        self._swarm_dot = self._make_swarm_dot()
+        self._bird_best = self._make_bird_sprite(config.COLOR_BIRD_BEST, config.BIRD_RADIUS + 1)
+        self._bird_player = self._make_bird_sprite(config.COLOR_PLAYER, config.BIRD_RADIUS + 1)
+        self._trail_dots = self._make_trail_dots()
+
+        rng = random.Random(7)
         self.stars = [
-            (rng.uniform(0, config.GAME_WIDTH), rng.uniform(0, config.HEIGHT * 0.6),
-             rng.uniform(0.6, 2.1), rng.uniform(0, math.tau), rng.uniform(4, 16))
+            (rng.randint(0, config.GAME_WIDTH), rng.randint(0, int(config.HEIGHT * 0.72)),
+             rng.choice((1, 1, 1, 2)), rng.uniform(0, math.tau))
             for _ in range(config.STAR_COUNT)
         ]
-        self.nebulae = [
-            (self._radial_glow(230, config.COLOR_NEBULA_A, 42), 150, 170, 12.0),
-            (self._radial_glow(200, config.COLOR_NEBULA_B, 36), 560, 300, 16.0),
-        ]
-        # Parallax-Bergketten (Surface, Drift-Tempo) von fern nach nah.
-        self.mountains = [
-            (self._make_mountain_layer(config.COLOR_MOUNTAIN_FAR, config.HEIGHT * 0.62, 110, 7, 1), 8.0),
-            (self._make_mountain_layer(config.COLOR_MOUNTAIN_MID, config.HEIGHT * 0.74, 150, 9, 2), 15.0),
-            (self._make_mountain_layer(config.COLOR_MOUNTAIN_NEAR, config.HEIGHT * 0.88, 190, 11, 3), 26.0),
-        ]
-        self.moon_pos = (int(config.GAME_WIDTH * 0.76), int(config.HEIGHT * 0.22))
-        self.moon_r = 46
-        self._moon_glow = self._radial_glow(120, config.COLOR_MOON_GLOW, 90)
 
-        self._bird_glow = self._radial_glow(int(config.BIRD_RADIUS * 2.3), config.COLOR_BIRD_GLOW, 60)
-        self._leader_aura = self._radial_glow(config.BIRD_RADIUS * 4, config.COLOR_LEADER_AURA, 150)
-        self._player_aura = self._radial_glow(config.BIRD_RADIUS * 4, config.COLOR_PLAYER, 120)
-
-        self.mode_rect = pygame.Rect(config.GAME_WIDTH + 18, 78, config.PANEL_WIDTH - 36, 34)
-        self.toggle_rect = pygame.Rect(config.GAME_WIDTH + 18, 120, config.PANEL_WIDTH - 36, 38)
+        px = config.GAME_WIDTH + self.PAD
+        pw = config.PANEL_WIDTH - 2 * self.PAD
+        self.mode_rect = pygame.Rect(px, 92, pw, 36)
+        self.toggle_rect = pygame.Rect(px, 140, pw, 42)
         self._trail: list[tuple[float, float]] = []
 
     # ------------------------------------------------------------------
-    # Hilfssurfaces
+    # Vorberechnete Flächen
     # ------------------------------------------------------------------
-    def _make_gradient(self) -> pygame.Surface:
+    def _make_sky(self) -> pygame.Surface:
         surf = pygame.Surface((config.GAME_WIDTH, config.HEIGHT))
-        top, bottom = config.COLOR_BG_TOP, config.COLOR_BG_BOTTOM
-        for y in range(config.HEIGHT):
-            f = y / config.HEIGHT
-            color = tuple(int(top[i] + (bottom[i] - top[i]) * f) for i in range(3))
+        top, mid, bot = config.COLOR_SKY_TOP, config.COLOR_SKY_MID, config.COLOR_SKY_BOTTOM
+        h = config.HEIGHT
+        for y in range(h):
+            f = y / h
+            color = _lerp(top, mid, f / 0.55) if f < 0.55 else _lerp(mid, bot, (f - 0.55) / 0.45)
             pygame.draw.line(surf, color, (0, y), (config.GAME_WIDTH, y))
         return surf
 
-    def _radial_glow(self, radius: int, color: tuple[int, int, int], max_alpha: int) -> pygame.Surface:
-        surf = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        for r in range(radius, 0, -1):
-            alpha = int(max_alpha * (1 - r / radius) ** 2)
-            if alpha > 0:
-                pygame.draw.circle(surf, (*color, alpha), (radius, radius), r)
-        return surf
+    def _make_pipe_texture(self) -> pygame.Surface:
+        # Volle-Höhe-Röhre mit horizontalem Verlauf; beim Zeichnen wird nur der
+        # benötigte Ausschnitt geblittet (kein per-Frame-Gradient mehr).
+        w, h = config.PIPE_WIDTH, config.HEIGHT
+        tex = pygame.Surface((w, h))
+        dark, light = config.COLOR_PIPE_DARK, config.COLOR_PIPE_LIGHT
+        for col in range(w):
+            f = 1 - abs(col - w / 2) / (w / 2)
+            pygame.draw.line(tex, _lerp(dark, light, f ** 0.65), (col, 0), (col, h))
+        return tex
 
-    def _make_mountain_layer(self, color, base_y, amplitude, segments, seed) -> pygame.Surface:
-        rng = random.Random(seed)
-        w = config.GAME_WIDTH
-        surf = pygame.Surface((w, config.HEIGHT), pygame.SRCALPHA)
-        heights = [rng.uniform(0.25, 1.0) * amplitude for _ in range(segments)]
-        heights.append(heights[0])  # nahtloser Übergang beim Scrollen
-        points = [(0, config.HEIGHT)]
-        for i, h in enumerate(heights):
-            points.append((w * i / (len(heights) - 1), base_y - h))
-        points.append((w, config.HEIGHT))
-        pygame.draw.polygon(surf, color, points)
-        return surf
+    def _make_swarm_dot(self) -> pygame.Surface:
+        r = config.BIRD_RADIUS
+        size = r * 2 + 2
+        s = pygame.Surface((size, size), pygame.SRCALPHA)
+        c = size // 2
+        pygame.draw.circle(s, (*config.COLOR_BIRD, 140), (c, c), r)
+        pygame.draw.circle(s, (*config.COLOR_BIRD, 235), (c, c), r, 1)
+        return s
+
+    def _make_bird_sprite(self, color, radius: int) -> pygame.Surface:
+        size = radius * 2 + 14
+        s = pygame.Surface((size, size), pygame.SRCALPHA)
+        c = size // 2
+        pygame.draw.circle(s, color, (c, c), radius)
+        pygame.draw.circle(s, (245, 250, 255), (c, c), radius, 2)
+        eye = max(2, radius // 3)
+        pygame.draw.circle(s, (255, 255, 255), (c + radius // 2, c - radius // 3), eye)
+        pygame.draw.circle(s, (18, 22, 38), (c + radius // 2 + 1, c - radius // 3), max(1, eye // 2))
+        pygame.draw.polygon(s, config.COLOR_AMBER, [
+            (c + radius + 1, c - 1), (c + radius + 8, c - 3),
+            (c + radius + 8, c + 4), (c + radius + 1, c + 3)])
+        return s
+
+    def _make_trail_dots(self) -> list[pygame.Surface]:
+        dots = []
+        n = 10
+        for i in range(n):
+            r = max(1, int(config.BIRD_RADIUS * 0.55 * (i / n)))
+            a = int(70 * (i / n))
+            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*config.COLOR_BIRD_BEST, a), (r, r), r)
+            dots.append(surf)
+        return dots
 
     # ------------------------------------------------------------------
     # Haupt-Render
     # ------------------------------------------------------------------
     def render(self, sim, speed: int, active: bool = True) -> None:
         t = pygame.time.get_ticks() / 1000.0
-        self._draw_background(t)
-        self._draw_pipes(sim, t)
-        self._draw_birds(sim, t)
+        self._draw_world(t)
+        self._draw_pipes(sim)
+        self._draw_birds(sim)
         if sim.mode == "human" and sim.human_dead:
-            self._draw_human_overlay(sim)
-        self._draw_panel(sim, speed, active, t)
+            self._draw_game_over(sim)
+        self._draw_panel(sim, speed, active)
+        self._draw_fps()
         pygame.display.flip()
 
-    def _draw_background(self, t: float) -> None:
-        self.screen.blit(self._bg, (0, 0))
+    def _draw_world(self, t: float) -> None:
+        self.screen.blit(self._sky, (0, 0))
+        for (sx, sy, size, phase) in self.stars:
+            tw = 0.55 + 0.45 * math.sin(t * 1.6 + phase)
+            shade = int(80 + 130 * tw)
+            self.screen.fill((shade, shade, min(255, shade + 45)), (sx, sy, size, size))
+        gy = config.HEIGHT - 34
+        self.screen.fill(config.COLOR_GROUND, (0, gy, config.GAME_WIDTH, 34))
+        pygame.draw.line(self.screen, config.COLOR_GROUND_EDGE, (0, gy), (config.GAME_WIDTH, gy), 2)
 
-        for (sx, sy, size, phase, drift) in self.stars:
-            x = (sx - t * drift) % config.GAME_WIDTH
-            twinkle = 0.5 + 0.5 * math.sin(t * 2.2 + phase)
-            shade = int(120 + 135 * twinkle)
-            pygame.draw.circle(self.screen, (shade, shade, min(255, shade + 40)), (int(x), int(sy)), max(1, int(size)))
+    def _draw_fps(self) -> None:
+        fps = self.clock.get_fps()
+        txt = self.font_label.render(f"{fps:.0f} FPS", True, config.COLOR_TEXT_DIM)
+        self.screen.blit(txt, (config.GAME_WIDTH - txt.get_width() - 12, 10))
 
-        for surf, bx, by, drift in self.nebulae:
-            dx = (bx - t * drift) % (config.GAME_WIDTH + 460) - 230
-            self.screen.blit(surf, (dx, by - surf.get_height() / 2), special_flags=pygame.BLEND_ADD)
-
-        # Mond mit weichem Schein.
-        mx, my = self.moon_pos
-        self.screen.blit(self._moon_glow, (mx - 120, my - 120), special_flags=pygame.BLEND_ADD)
-        pygame.draw.circle(self.screen, config.COLOR_MOON, (mx, my), self.moon_r)
-        pygame.draw.circle(self.screen, (208, 206, 188), (mx - 14, my - 10), 8)
-        pygame.draw.circle(self.screen, (208, 206, 188), (mx + 12, my + 8), 6)
-        pygame.draw.circle(self.screen, (208, 206, 188), (mx + 4, my - 16), 4)
-
-        # Parallax-Bergketten.
-        for surf, drift in self.mountains:
-            offset = int(t * drift) % config.GAME_WIDTH
-            self.screen.blit(surf, (-offset, 0))
-            self.screen.blit(surf, (config.GAME_WIDTH - offset, 0))
-
-    def _draw_pipes(self, sim, t: float) -> None:
-        pulse = 0.5 + 0.5 * math.sin(t * 4.0)
+    def _draw_pipes(self, sim) -> None:
+        tex = self._pipe_tex
+        w = config.PIPE_WIDTH
+        cap = config.COLOR_PIPE_CAP
+        edge = config.COLOR_PIPE_DARK
+        H = config.HEIGHT
         for pipe in sim.pipes:
             x = int(pipe.x)
-            w = config.PIPE_WIDTH
             top_h = int(pipe.gap_top)
             bot_y = int(pipe.gap_bottom)
-
-            glow = pygame.Surface((w + 24, config.HEIGHT), pygame.SRCALPHA)
-            glow.fill((*config.COLOR_PIPE_GLOW, 24))
-            self.screen.blit(glow, (x - 12, 0), special_flags=pygame.BLEND_ADD)
-
-            self._draw_pipe_body(x, 0, w, top_h)
-            self._draw_pipe_body(x, bot_y, w, config.HEIGHT - bot_y)
-
-            cap_color = tuple(int(config.COLOR_PIPE_CAP[i] * (0.7 + 0.3 * pulse)) for i in range(3))
-            pygame.draw.rect(self.screen, cap_color, (x - 4, top_h - 14, w + 8, 14), border_radius=5)
-            pygame.draw.rect(self.screen, cap_color, (x - 4, bot_y, w + 8, 14), border_radius=5)
-
-    def _draw_pipe_body(self, x: int, y: int, w: int, h: int) -> None:
-        if h <= 0:
-            return
-        body = pygame.Surface((w, h))
-        core, glow = config.COLOR_PIPE_CORE, config.COLOR_PIPE_GLOW
-        for col in range(w):
-            f = 1 - abs(col - w / 2) / (w / 2)
-            shade = tuple(int(core[i] + (glow[i] - core[i]) * f * 0.55) for i in range(3))
-            pygame.draw.line(body, shade, (col, 0), (col, h))
-        self.screen.blit(body, (x, y))
-        pygame.draw.rect(self.screen, config.COLOR_PIPE_CAP, (x, y, w, h), 2)
+            if top_h > 0:
+                self.screen.blit(tex, (x, 0), (0, 0, w, top_h))
+            bot_h = H - bot_y
+            if bot_h > 0:
+                self.screen.blit(tex, (x, bot_y), (0, 0, w, bot_h))
+            pygame.draw.rect(self.screen, cap, (x - 5, top_h - 15, w + 10, 15), border_radius=6)
+            pygame.draw.rect(self.screen, cap, (x - 5, bot_y, w + 10, 15), border_radius=6)
+            pygame.draw.line(self.screen, edge, (x, 0), (x, top_h))
+            pygame.draw.line(self.screen, edge, (x + w - 1, 0), (x + w - 1, top_h))
+            pygame.draw.line(self.screen, edge, (x, bot_y), (x, H))
+            pygame.draw.line(self.screen, edge, (x + w - 1, bot_y), (x + w - 1, H))
 
     # ------------------------------------------------------------------
     # Vögel
     # ------------------------------------------------------------------
-    def _bird_sprite(self, color, velocity: float, t: float) -> pygame.Surface:
-        size = config.BIRD_RADIUS * 4
-        s = pygame.Surface((size, size), pygame.SRCALPHA)
-        cx = cy = size // 2
-        r = config.BIRD_RADIUS + 1
-        pygame.draw.circle(s, color, (cx, cy), r)
-        pygame.draw.circle(s, (255, 255, 255), (cx, cy), r, 2)
-        wing = math.sin(t * 16) * 4
-        pygame.draw.ellipse(s, config.COLOR_BIRD_WING, (cx - 11, cy - 2 + wing, 13, 9))
-        pygame.draw.circle(s, (255, 255, 255), (cx + 5, cy - 4), 3)
-        pygame.draw.circle(s, (18, 18, 30), (cx + 6, cy - 4), 1)
-        pygame.draw.polygon(s, (250, 175, 60), [(cx + r, cy), (cx + r + 8, cy - 2), (cx + r + 8, cy + 3)])
-        angle = max(-32, min(65, -velocity * 4.5))
-        return pygame.transform.rotate(s, angle)
-
-    def _draw_birds(self, sim, t: float) -> None:
+    def _draw_birds(self, sim) -> None:
         if sim.mode == "human":
             if sim.player is not None:
-                pos = (config.BIRD_X, int(sim.player.y))
-                ar = self._player_aura.get_width() / 2
-                self.screen.blit(self._player_aura, (pos[0] - ar, pos[1] - ar), special_flags=pygame.BLEND_ADD)
-                sprite = self._bird_sprite(config.COLOR_PLAYER, sim.player.velocity, t)
-                self.screen.blit(sprite, sprite.get_rect(center=pos))
+                self._blit_bird(self._bird_player, sim.player.y, sim.player.velocity)
             return
 
+        dot = self._swarm_dot
+        off = dot.get_width() // 2
+        bx = config.BIRD_X
         best = sim.population.best_alive()
-        glow_layer = pygame.Surface((config.GAME_WIDTH, config.HEIGHT), pygame.SRCALPHA)
-        gw = self._bird_glow.get_width() / 2
+        blit = self.screen.blit
         for bird in sim.population.birds:
             if bird.alive and bird is not best:
-                glow_layer.blit(self._bird_glow, (config.BIRD_X - gw, bird.y - gw))
-        self.screen.blit(glow_layer, (0, 0), special_flags=pygame.BLEND_ADD)
-
+                blit(dot, (bx - off, int(bird.y) - off))
         if best is not None:
-            self._draw_leader(best, t)
+            self._draw_leader(best)
 
-    def _draw_leader(self, bird, t: float) -> None:
-        pos = (config.BIRD_X, int(bird.y))
-        ar = self._leader_aura.get_width() / 2
-        self.screen.blit(self._leader_aura, (pos[0] - ar, pos[1] - ar), special_flags=pygame.BLEND_ADD)
-
-        self._trail.append((float(pos[0]), float(pos[1])))
-        if len(self._trail) > 14:
+    def _draw_leader(self, bird) -> None:
+        self._trail.append((float(config.BIRD_X), float(bird.y)))
+        if len(self._trail) > len(self._trail_dots):
             self._trail.pop(0)
         for i, (tx, ty) in enumerate(self._trail[:-1]):
-            alpha = int(120 * (i / len(self._trail)))
-            r = max(1, int(config.BIRD_RADIUS * 0.5 * (i / len(self._trail))))
-            dot = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(dot, (*config.COLOR_BIRD_BEST, alpha), (r, r), r)
-            self.screen.blit(dot, (tx - r, ty - r), special_flags=pygame.BLEND_ADD)
+            surf = self._trail_dots[i]
+            o = surf.get_width() // 2
+            self.screen.blit(surf, (tx - o, ty - o))
+        self._blit_bird(self._bird_best, bird.y, bird.velocity)
 
-        sprite = self._bird_sprite(config.COLOR_BIRD_BEST, bird.velocity, t)
-        self.screen.blit(sprite, sprite.get_rect(center=pos))
-
-    def _draw_human_overlay(self, sim) -> None:
-        overlay = pygame.Surface((config.GAME_WIDTH, config.HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
-        self.screen.blit(overlay, (0, 0))
-        cx, cy = config.GAME_WIDTH // 2, config.HEIGHT // 2
-        title = self.font_huge.render("GAME OVER", True, (235, 110, 110))
-        self.screen.blit(title, title.get_rect(center=(cx, cy - 50)))
-        score = self.font_big.render(f"Dein Score: {sim.human_score}", True, config.COLOR_TEXT)
-        self.screen.blit(score, score.get_rect(center=(cx, cy + 6)))
-        cmp = self.font.render(f"Die KI schafft bis zu {sim.population.best_score_ever}", True, config.COLOR_BIRD_BEST)
-        self.screen.blit(cmp, cmp.get_rect(center=(cx, cy + 42)))
-        again = self.font.render("Leertaste / Klick für neuen Versuch", True, config.COLOR_TEXT_DIM)
-        self.screen.blit(again, again.get_rect(center=(cx, cy + 78)))
+    def _blit_bird(self, sprite, y: float, velocity: float) -> None:
+        angle = max(-30, min(60, -velocity * 4.0))
+        rot = pygame.transform.rotate(sprite, angle)
+        self.screen.blit(rot, rot.get_rect(center=(config.BIRD_X, int(y))))
 
     # ------------------------------------------------------------------
     # Panel
     # ------------------------------------------------------------------
-    def _draw_panel(self, sim, speed: int, active: bool, t: float) -> None:
+    def _draw_panel(self, sim, speed: int, active: bool) -> None:
         px = config.GAME_WIDTH
-        pygame.draw.rect(self.screen, config.COLOR_PANEL_BG, (px, 0, config.PANEL_WIDTH, config.HEIGHT))
-        pygame.draw.line(self.screen, config.COLOR_ACCENT, (px, 0), (px, config.HEIGHT), 2)
-        cx = px + 20
+        cx = px + self.PAD
+        pw = config.PANEL_WIDTH - 2 * self.PAD
+        self.screen.fill(config.COLOR_PANEL_BG, (px, 0, config.PANEL_WIDTH, config.HEIGHT))
+        pygame.draw.line(self.screen, config.COLOR_CARD_BORDER, (px, 0), (px, config.HEIGHT), 1)
 
-        self.screen.blit(self.font_big.render("NeuroFlap", True, config.COLOR_TEXT), (cx, 14))
-        self.screen.blit(self.font_small.render("KI lernt per Neuroevolution", True, config.COLOR_TEXT_DIM), (cx, 48))
+        self.screen.blit(self.font_big.render("NeuroFlap", True, config.COLOR_TEXT), (cx, 24))
+        self.screen.blit(self.font_small.render("Neuroevolution · KI lernt fliegen", True, config.COLOR_TEXT_DIM), (cx, 56))
 
-        self._draw_mode_switch(px, sim.mode)
+        self._draw_mode_switch(cx, pw, sim.mode)
 
         if sim.mode == "human":
-            self._draw_human_panel(sim, px, cx)
+            self._draw_human_panel(sim, cx, pw)
         else:
-            self._draw_ai_panel(sim, speed, active, px, cx)
+            self._draw_ai_panel(sim, speed, active, cx, pw)
 
-        hint = ("Fliegen: Leertaste/Klick   M KI-Modus   R Neu   Esc"
+        hint = ("Leertaste / Klick fliegen   ·   M: KI   ·   R: neu"
                 if sim.mode == "human"
-                else "M Selbst spielen   Klick/Space An/Aus   1-5 Tempo   R Reset")
-        self.screen.blit(self.font_label.render(hint, True, config.COLOR_TEXT_DIM), (cx, config.HEIGHT - 24))
+                else "M: selbst spielen   ·   Space: Pause   ·   1–5: Tempo   ·   R: Reset")
+        self.screen.blit(self.font_label.render(hint, True, config.COLOR_TEXT_DIM), (cx, config.HEIGHT - 26))
 
-    def _draw_mode_switch(self, px: int, mode: str) -> None:
-        card = pygame.Rect(px + 18, 78, config.PANEL_WIDTH - 36, 34)
+    def _draw_mode_switch(self, cx: int, pw: int, mode: str) -> None:
+        card = pygame.Rect(cx, 92, pw, 36)
         self.mode_rect = card
-        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, card, border_radius=9)
+        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, card, border_radius=10)
         half = card.width // 2
-        ai_rect = pygame.Rect(card.x + 2, card.y + 2, half - 3, card.height - 4)
-        hu_rect = pygame.Rect(card.x + half + 1, card.y + 2, half - 3, card.height - 4)
-        pygame.draw.rect(self.screen, config.COLOR_MODE_ACTIVE if mode == "ai" else config.COLOR_MODE_INACTIVE, ai_rect, border_radius=7)
-        pygame.draw.rect(self.screen, config.COLOR_MODE_ACTIVE if mode == "human" else config.COLOR_MODE_INACTIVE, hu_rect, border_radius=7)
-        a = self.font_small.render("KI-Training", True, config.COLOR_TEXT)
-        h = self.font_small.render("Selbst spielen", True, config.COLOR_TEXT)
+        ai_rect = pygame.Rect(card.x + 3, card.y + 3, half - 4, card.height - 6)
+        hu_rect = pygame.Rect(card.x + half + 1, card.y + 3, half - 4, card.height - 6)
+        active_rect = ai_rect if mode == "ai" else hu_rect
+        pygame.draw.rect(self.screen, config.COLOR_MODE_ACTIVE, active_rect, border_radius=8)
+        ai_col = (10, 18, 30) if mode == "ai" else config.COLOR_TEXT_DIM
+        hu_col = (10, 18, 30) if mode == "human" else config.COLOR_TEXT_DIM
+        a = self.font_small.render("KI-Training", True, ai_col)
+        h = self.font_small.render("Selbst spielen", True, hu_col)
         self.screen.blit(a, a.get_rect(center=ai_rect.center))
         self.screen.blit(h, h.get_rect(center=hu_rect.center))
 
-    def _draw_ai_panel(self, sim, speed: int, active: bool, px: int, cx: int) -> None:
-        self._draw_toggle(px, 120, active)
+    def _draw_ai_panel(self, sim, speed: int, active: bool, cx: int, pw: int) -> None:
         pop = sim.population
+        self._draw_toggle(cx, 140, pw, active)
+
+        y = 196
+        gap = 12
+        cw = (pw - gap) // 2
+        self._stat_card(cx, y, cw, "GENERATION", str(pop.generation), config.COLOR_ACCENT)
+        self._stat_card(cx + cw + gap, y, cw, "BESTER SCORE", str(pop.best_score_ever), config.COLOR_AMBER)
+        y += 86
+
         rows = [
-            ("Generation", f"{pop.generation}", config.COLOR_ACCENT_2),
-            ("Vögel am Leben", f"{len(pop.alive_birds())} / {config.POPULATION_SIZE}", config.COLOR_TEXT),
-            ("Score aktuell", f"{sim.current_score()}", config.COLOR_TEXT),
-            ("Bester Score", f"{pop.best_score_ever}", config.COLOR_BIRD_BEST),
-            ("Tempo", f"{config.PIPE_SPEED + min(sim.current_score() * config.DIFF_SPEED_PER_SCORE, config.PIPE_SPEED_MAX_BONUS):.1f}", config.COLOR_ACCENT_2),
-            ("Simulationstempo", f"{speed}x", config.COLOR_ACCENT),
+            ("Vögel am Leben", f"{len(pop.alive_birds())} / {config.POPULATION_SIZE}"),
+            ("Score aktuell", f"{sim.current_score()}"),
+            ("Tempo", f"{sim.difficulty_speed(sim.current_score()):.1f}"),
+            ("Simulationstempo", f"{speed}×"),
         ]
-        y = 172
-        for label, value, color in rows:
+        for label, value in rows:
             self.screen.blit(self.font_small.render(label, True, config.COLOR_TEXT_DIM), (cx, y))
-            val = self.font.render(value, True, color)
-            self.screen.blit(val, (px + config.PANEL_WIDTH - 20 - val.get_width(), y - 2))
-            y += 24
+            val = self.font.render(value, True, config.COLOR_TEXT)
+            self.screen.blit(val, (cx + pw - val.get_width(), y - 1))
+            y += 26
 
-        self._draw_network(sim, px + 16, y + 4, config.PANEL_WIDTH - 32, 176)
-        self._draw_fitness_graph(sim, px + 16, y + 210, config.PANEL_WIDTH - 32, 104)
+        y += 2
+        frac = len(pop.alive_birds()) / config.POPULATION_SIZE
+        self._bar(cx, y, pw, frac, config.COLOR_ACCENT_2)
+        y += 22
 
-    def _draw_human_panel(self, sim, px: int, cx: int) -> None:
-        y = 132
-        self.screen.blit(self.font_small.render("Dein Score", True, config.COLOR_TEXT_DIM), (cx, y))
-        big = self.font_huge.render(str(sim.human_score), True, config.COLOR_PLAYER)
-        self.screen.blit(big, (cx, y + 18))
+        net_h = 150
+        self._draw_network(sim, cx, y, pw, net_h)
+        y += net_h + 14
+        self._draw_fitness_graph(sim, cx, y, pw, config.HEIGHT - y - 42)
 
-        y += 96
+    def _draw_human_panel(self, sim, cx: int, pw: int) -> None:
+        y = 150
+        card = pygame.Rect(cx, y, pw, 96)
+        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, card, border_radius=12)
+        self.screen.blit(self.font_label.render("DEIN SCORE", True, config.COLOR_TEXT_DIM), (cx + 14, y + 12))
+        self.screen.blit(self.font_huge.render(str(sim.human_score), True, config.COLOR_PLAYER), (cx + 12, y + 32))
+        y += 116
+
         rows = [
-            ("Dein Bestwert", f"{sim.human_best}", config.COLOR_PLAYER),
-            ("KI-Bestwert", f"{sim.population.best_score_ever}", config.COLOR_BIRD_BEST),
-            ("Aktuelles Tempo", f"{sim.difficulty_speed(sim.human_score):.1f}", config.COLOR_ACCENT_2),
-            ("Lücke", f"{int(sim.difficulty_gap(sim.human_score))} px", config.COLOR_TEXT),
+            ("Dein Bestwert", f"{sim.human_best}"),
+            ("KI-Bestwert", f"{sim.population.best_score_ever}"),
+            ("Tempo", f"{sim.difficulty_speed(sim.human_score):.1f}"),
+            ("Lücke", f"{int(sim.difficulty_gap(sim.human_score))} px"),
         ]
-        for label, value, color in rows:
+        for label, value in rows:
             self.screen.blit(self.font_small.render(label, True, config.COLOR_TEXT_DIM), (cx, y))
-            val = self.font.render(value, True, color)
-            self.screen.blit(val, (px + config.PANEL_WIDTH - 20 - val.get_width(), y - 2))
-            y += 28
+            val = self.font.render(value, True, config.COLOR_TEXT)
+            self.screen.blit(val, (cx + pw - val.get_width(), y - 1))
+            y += 30
 
-        y += 12
-        for line in ["So schwer ist es!", "Schaffst du mehr", "als die KI?"]:
-            self.screen.blit(self.font_small.render(line, True, config.COLOR_TEXT_DIM), (cx, y))
-            y += 22
+        y += 16
+        for line in ("Schaffst du mehr", "als die KI?"):
+            self.screen.blit(self.font.render(line, True, config.COLOR_TEXT_DIM), (cx, y))
+            y += 26
 
-    def _draw_toggle(self, px: int, y: int, active: bool) -> None:
-        card = pygame.Rect(px + 18, y, config.PANEL_WIDTH - 36, 38)
+    # ------------------------------------------------------------------
+    # Panel-Bausteine
+    # ------------------------------------------------------------------
+    def _stat_card(self, x: int, y: int, w: int, label: str, value: str, accent) -> None:
+        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, 72), border_radius=10)
+        self.screen.blit(self.font_label.render(label, True, config.COLOR_TEXT_DIM), (x + 12, y + 11))
+        self.screen.blit(self.font_stat.render(value, True, accent), (x + 12, y + 30))
+
+    def _bar(self, x: int, y: int, w: int, frac: float, color) -> None:
+        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, 8), border_radius=4)
+        fw = max(0, min(w, int(w * frac)))
+        if fw > 0:
+            pygame.draw.rect(self.screen, color, (x, y, fw, 8), border_radius=4)
+
+    def _draw_toggle(self, cx: int, y: int, pw: int, active: bool) -> None:
+        card = pygame.Rect(cx, y, pw, 42)
         self.toggle_rect = card
         pygame.draw.rect(self.screen, config.COLOR_CARD_BG, card, border_radius=10)
-        pygame.draw.rect(self.screen, config.COLOR_ACCENT if active else config.COLOR_TOGGLE_OFF, card, 1, border_radius=10)
-        label = "Simulation läuft" if active else "Simulation pausiert"
-        self.screen.blit(self.font_small.render(label, True, config.COLOR_TEXT), (card.x + 12, card.y + 11))
-        sw_w, sw_h = 46, 22
+        pygame.draw.rect(self.screen, config.COLOR_ACCENT_2 if active else config.COLOR_CARD_BORDER, card, 1, border_radius=10)
+        label = "Simulation läuft" if active else "Pausiert"
+        self.screen.blit(self.font_small.render(label, True, config.COLOR_TEXT), (card.x + 14, card.y + 13))
+        sw_w, sw_h = 44, 22
         sx = card.right - sw_w - 12
         sy = card.y + (card.height - sw_h) // 2
         pygame.draw.rect(self.screen, config.COLOR_TOGGLE_ON if active else config.COLOR_TOGGLE_OFF, (sx, sy, sw_w, sw_h), border_radius=11)
-        knob_x = sx + sw_w - sw_h // 2 - 2 if active else sx + sw_h // 2 + 2
+        knob_x = sx + sw_w - sw_h // 2 if active else sx + sw_h // 2
         pygame.draw.circle(self.screen, config.COLOR_TOGGLE_KNOB, (knob_x, sy + sw_h // 2), sw_h // 2 - 3)
 
     def _draw_network(self, sim, x: int, y: int, w: int, h: int) -> None:
-        self.screen.blit(self.font_small.render("Gehirn des Anführers", True, config.COLOR_TEXT_DIM), (x, y))
-        top = y + 22
-        area_h = h - 22
+        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, h), border_radius=10)
+        self.screen.blit(self.font_label.render("GEHIRN DES ANFÜHRERS", True, config.COLOR_TEXT_DIM), (x + 12, y + 10))
         best = sim.population.best_alive()
         brain = best.brain if best is not None else None
-        layers = [config.INPUT_SIZE, config.HIDDEN_SIZE, config.OUTPUT_SIZE]
-        activations = [brain.last_input, brain.last_hidden, brain.last_output] if brain else None
+        layers = (config.INPUT_SIZE, config.HIDDEN_SIZE, config.OUTPUT_SIZE)
+        acts = [brain.last_input, brain.last_hidden, brain.last_output] if brain else None
 
+        top = y + 34
+        area_h = h - 46
+        inner_x = x + 24
+        inner_w = w - 48
         positions: list[list[tuple[int, int]]] = []
         for li, count in enumerate(layers):
-            lx = min(max(x + int(w * (li / (len(layers) - 1))), x + 14), x + w - 14)
+            lx = inner_x + int(inner_w * (li / (len(layers) - 1)))
             positions.append([(lx, top + int(area_h * ((n + 0.5) / count))) for n in range(count)])
 
         if brain is not None:
-            self._draw_edges(positions[0], positions[1], brain.w1)
-            self._draw_edges(positions[1], positions[2], brain.w2)
+            self._edges(positions[0], positions[1], brain.w1)
+            self._edges(positions[1], positions[2], brain.w2)
         for li, col in enumerate(positions):
             for n, (nx, ny) in enumerate(col):
-                act = abs(activations[li][n]) if activations and n < len(activations[li]) else 0.0
-                shade = min(255, int(70 + act * 185))
-                pygame.draw.circle(self.screen, (shade, shade, min(255, shade + 30)), (nx, ny), 8)
-                pygame.draw.circle(self.screen, config.COLOR_NODE, (nx, ny), 8, 1)
+                act = abs(acts[li][n]) if acts and n < len(acts[li]) else 0.0
+                color = _lerp(config.COLOR_NODE, config.COLOR_NODE_ON, min(1.0, act))
+                pygame.draw.circle(self.screen, color, (nx, ny), 7)
+                pygame.draw.circle(self.screen, config.COLOR_CARD_BORDER, (nx, ny), 7, 1)
 
-    def _draw_edges(self, src, dst, weights) -> None:
+    def _edges(self, src, dst, weights) -> None:
         for j, (dx, dy) in enumerate(dst):
             row = weights[j] if j < len(weights) else []
             for i, (sx, sy) in enumerate(src):
                 if i < len(row):
-                    color = config.COLOR_EDGE_POS if row[i] >= 0 else config.COLOR_EDGE_NEG
-                    pygame.draw.line(self.screen, color, (sx, sy), (dx, dy), max(1, min(4, int(abs(row[i]) * 1.5))))
+                    weight = row[i]
+                    color = config.COLOR_EDGE_POS if weight >= 0 else config.COLOR_EDGE_NEG
+                    pygame.draw.line(self.screen, color, (sx, sy), (dx, dy), max(1, min(3, int(abs(weight) * 1.4))))
 
     def _draw_fitness_graph(self, sim, x: int, y: int, w: int, h: int) -> None:
-        self.screen.blit(self.font_small.render("Beste Fitness je Generation", True, config.COLOR_TEXT_DIM), (x, y))
-        gy, gh = y + 22, h - 22
-        pygame.draw.rect(self.screen, (10, 12, 24), (x, gy, w, gh))
-        pygame.draw.rect(self.screen, config.COLOR_NODE, (x, gy, w, gh), 1)
+        if h < 46:
+            return
+        pygame.draw.rect(self.screen, config.COLOR_CARD_BG, (x, y, w, h), border_radius=10)
+        self.screen.blit(self.font_label.render("FITNESS JE GENERATION", True, config.COLOR_TEXT_DIM), (x + 12, y + 10))
+        gx, gy = x + 12, y + 32
+        gw, gh = w - 24, h - 44
         history = sim.population.fitness_history
         if len(history) < 2:
             return
         peak = max(history) or 1.0
         n = len(history)
-        points = [(x + int(w * (i / (n - 1))), gy + gh - int(gh * (v / peak))) for i, v in enumerate(history)]
-        pygame.draw.lines(self.screen, config.COLOR_ACCENT_2, False, points, 2)
+        points = [(gx + int(gw * (i / (n - 1))), gy + gh - int(gh * (v / peak))) for i, v in enumerate(history)]
+        fill = pygame.Surface((w, h), pygame.SRCALPHA)
+        poly = [(px_ - x, py_ - y) for px_, py_ in points] + [(points[-1][0] - x, gy + gh - y), (points[0][0] - x, gy + gh - y)]
+        pygame.draw.polygon(fill, (*config.COLOR_ACCENT, 45), poly)
+        self.screen.blit(fill, (x, y))
+        pygame.draw.lines(self.screen, config.COLOR_ACCENT, False, points, 2)
+
+    def _draw_game_over(self, sim) -> None:
+        overlay = pygame.Surface((config.GAME_WIDTH, config.HEIGHT), pygame.SRCALPHA)
+        overlay.fill((8, 12, 24, 175))
+        self.screen.blit(overlay, (0, 0))
+        cx, cy = config.GAME_WIDTH // 2, config.HEIGHT // 2
+        title = self.font_huge.render("Game Over", True, config.COLOR_TEXT)
+        self.screen.blit(title, title.get_rect(center=(cx, cy - 54)))
+        score = self.font_big.render(f"Dein Score: {sim.human_score}", True, config.COLOR_PLAYER)
+        self.screen.blit(score, score.get_rect(center=(cx, cy)))
+        cmp = self.font.render(f"KI-Bestwert: {sim.population.best_score_ever}", True, config.COLOR_AMBER)
+        self.screen.blit(cmp, cmp.get_rect(center=(cx, cy + 38)))
+        again = self.font_small.render("Leertaste oder Klick für neuen Versuch", True, config.COLOR_TEXT_DIM)
+        self.screen.blit(again, again.get_rect(center=(cx, cy + 76)))

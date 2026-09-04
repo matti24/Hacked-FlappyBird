@@ -88,3 +88,34 @@ def test_flap_after_death_restarts_round():
     sim.player_flap()
     assert not sim.human_dead
     assert sim.human_score == 0
+
+
+def test_center_bonus_adds_fitness():
+    """Ein zentral in der Lücke fliegender Vogel sammelt Zusatz-Fitness."""
+    sim = Simulation(random.Random(1))
+    for other in sim.population.birds[1:]:
+        other.alive = False
+    bird = sim.population.birds[0]
+    pipe = sim._next_pipe()
+    assert pipe is not None
+    bird.y = pipe.gap_y          # genau in der Mitte der Lücke
+    bird.velocity = 0.0
+    bird.fitness = 0.0
+    sim._step_ai()
+    # Basis-Überlebensbonus (1.0) plus Zentrierungsbonus (> 0)
+    assert bird.fitness > 1.0
+
+
+def test_round_ends_at_frame_limit(monkeypatch):
+    """Auch wenn Vögel unsterblich wären, wechselt die Runde beim Frame-Limit."""
+    monkeypatch.setattr(config, "MAX_ROUND_FRAMES", 5)
+    sim = Simulation(random.Random(1))
+    # Kollisionen ausschalten, damit niemand am Rand/Rohr stirbt.
+    for bird in sim.population.birds:
+        bird.update = lambda: None  # type: ignore[method-assign]
+    for pipe in sim.pipes:
+        pipe.collides_with = lambda _y: False  # type: ignore[method-assign]
+    start_gen = sim.population.generation
+    for _ in range(6):
+        sim.step()
+    assert sim.population.generation > start_gen

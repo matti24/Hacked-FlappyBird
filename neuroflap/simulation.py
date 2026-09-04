@@ -90,6 +90,7 @@ class Simulation:
         score = self.current_score()
         speed = self.difficulty_speed(score)
         pipe = self._next_pipe()
+        r = config.BIRD_RADIUS
 
         for bird in self.population.birds:
             if not bird.alive:
@@ -97,8 +98,12 @@ class Simulation:
             if pipe is not None:
                 bird.decide(self._inputs_for(bird, pipe))
             bird.update()
-            bird.fitness += 1
-            if bird.y - config.BIRD_RADIUS < 0 or bird.y + config.BIRD_RADIUS > config.HEIGHT:
+            bird.fitness += 1.0
+            if pipe is not None:
+                # Zentrales Durchfliegen der Lücke belohnen (glatter Gradient).
+                closeness = max(0.0, 1.0 - abs(bird.y - pipe.gap_y) / (pipe.gap_size / 2.0))
+                bird.fitness += closeness * config.FITNESS_CENTER_BONUS
+            if bird.y - r < 0 or bird.y + r > config.HEIGHT:
                 bird.alive = False
                 continue
             for p in self.pipes:
@@ -115,12 +120,16 @@ class Simulation:
                 for bird in self.population.birds:
                     if bird.alive:
                         bird.score += 1
-                        bird.fitness += 25
+                        bird.fitness += config.FITNESS_PIPE_BONUS
 
-        self._recycle_pipes(self.current_score())
+        cur = self.current_score()
+        self._recycle_pipes(cur)
+        if cur > self.population.best_score_ever:
+            self.population.best_score_ever = cur
         self.frame += 1
 
-        if self.population.all_dead():
+        # Alle tot ODER Sicherheits-Limit erreicht -> nächste Generation.
+        if self.population.all_dead() or self.frame >= config.MAX_ROUND_FRAMES:
             self.population.evolve()
             self.reset_round()
 

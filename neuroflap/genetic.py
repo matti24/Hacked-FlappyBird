@@ -11,11 +11,21 @@ def uniform_crossover(genome_a: list[float], genome_b: list[float], rng: random.
 
 
 def mutate(genome: list[float], rate: float, strength: float, rng: random.Random) -> list[float]:
-    """Verändert einzelne Gene um einen zufälligen (gaußschen) Betrag."""
-    return [
-        gene + rng.gauss(0, strength) if rng.random() < rate else gene
-        for gene in genome
-    ]
+    """Verändert einzelne Gene: meist kleine gaßsche Schritte, selten ein Neustart.
+
+    Der gelegentliche Voll-Reset (~10 %) sorgt für Exploration, ohne die
+    bewährten Gewichte der Eltern flächig zu zerstören.
+    """
+    out: list[float] = []
+    for gene in genome:
+        if rng.random() < rate:
+            if rng.random() < 0.1:
+                out.append(rng.gauss(0.0, 1.0))
+            else:
+                out.append(gene + rng.gauss(0.0, strength))
+        else:
+            out.append(gene)
+    return out
 
 
 def tournament_select(
