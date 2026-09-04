@@ -1,4 +1,4 @@
-# 🧠🐦 NeuroFlap
+#  NeuroFlap
 
 Eine **KI, die sich vor deinen Augen selbst das Spielen beibringt.** Eine Population von
 150 Vögeln lernt per **Neuroevolution** Flappy Bird zu meistern – neuronale Netze **und**
@@ -7,7 +7,7 @@ ML-Bibliothek. Nur `pygame` für die Darstellung.
 
 ![Vorschau](docs/preview.png)
 
-## 🚀 Der Wow-Moment
+## Der Wow-Moment
 
 Du startest, und **alle Vögel sind hilflos** – sie stürzen sofort ab. Doch mit jeder
 Generation werden die Netze besser. Nach wenigen Generationen kippt es plötzlich:
@@ -22,7 +22,7 @@ Generation  8: beste Fitness  6263   bester Score 48   ← Durchbruch!
 Ab hier fliegen die besten Vögel praktisch endlos. **Niemand hat ihnen gezeigt, wie –
 sie haben es sich selbst beigebracht.**
 
-## ✨ Features
+## Features
 
 - **Neuronales Netz from scratch** – Feedforward-Netz (5 → 8 → 1) mit tanh/sigmoid,
   komplett in reinem Python ([`neural_net.py`](neuroflap/neural_net.py)).
@@ -39,7 +39,7 @@ sie haben es sich selbst beigebracht.**
 - **Atmosphärischer Hintergrund** – Parallax-Bergketten, leuchtender Mond, funkelnde Sterne.
 - **Zeitraffer** – Tempo bis 30× hochdrehen, um das Lernen im Schnelldurchlauf zu sehen.
 
-## 🎮 Steuerung
+## Steuerung
 
 | Taste | Aktion |
 | --- | --- |
@@ -50,7 +50,7 @@ sie haben es sich selbst beigebracht.**
 | `R` | Reset (neue Population bzw. neuer Versuch) |
 | `Esc` | Beenden |
 
-## 🧬 Wie es funktioniert
+## Wie es funktioniert
 
 Jeder Vogel wird von einem eigenen kleinen neuronalen Netz gesteuert. Es erhält fünf
 normalisierte Eingaben und entscheidet pro Frame, ob geflattert wird:
@@ -74,7 +74,7 @@ Beste behalten (Elite)  ──►  Turnier-Selektion der Eltern
 
 So verbessert sich die Population über die Generationen – ganz ohne Backpropagation.
 
-## 🛠️ Installation & Start
+## Installation & Start
 
 ```bash
 git clone <DEIN-REPO-URL>
@@ -92,7 +92,7 @@ python main.py
 
 > Benötigt **Python 3.10+**.
 
-## 🗂️ Projektstruktur
+## Projektstruktur
 
 ```
 neuroflap/
@@ -114,7 +114,7 @@ neuroflap/
 Die gesamte KI- und Simulationslogik ist von der Darstellung getrennt und damit
 **vollständig headless testbar**.
 
-## 🧪 Tests
+## Tests
 
 ```bash
 pip install pytest
@@ -124,6 +124,6 @@ pytest
 Getestet werden das neuronale Netz (Forward-Pass, Genom-Roundtrip), die genetischen
 Operatoren und die Simulation (Evolution, Kollision, Population).
 
-## 📜 Lizenz
+## Lizenz
 
 MIT – mach damit, was du willst.
