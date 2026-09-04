@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroFlap – Eine KI lernt Flappy Bird</title>
+    <meta name="description" content="Eine selbstlernende KI wird per Neuroevolution übermenschlich gut in Flappy Bird – neuronales Netz & genetischer Algorithmus from scratch." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧠%3C/text%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --bg: #05010f;
+        --text: #eef0ff;
+        --dim: #9aa0c3;
+        --violet: #a855f7;
+        --cyan: #06b6d4;
+        --pink: #ec4899;
+        --gold: #ffd65a;
+        --card: rgba(255, 255, 255, 0.05);
+        --border: rgba(255, 255, 255, 0.12);
+        --gradient: linear-gradient(135deg, #a855f7 0%, #06b6d4 50%, #ec4899 100%);
+        --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 20% 15%, rgba(124, 58, 237, 0.22), transparent 42%),
+          radial-gradient(circle at 82% 70%, rgba(6, 182, 212, 0.16), transparent 42%);
+        z-index: -1;
+        pointer-events: none;
+      }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 0 1.5rem; }
+
+      header { text-align: center; padding: clamp(3rem, 10vh, 6rem) 0 2rem; }
+      .logo {
+        font-size: clamp(2.6rem, 9vw, 5rem);
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        background: var(--gradient);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: shimmer 5s linear infinite;
+      }
+      @keyframes shimmer { to { background-position: 200% center; } }
+      .tagline {
+        font-size: clamp(1.05rem, 2.6vw, 1.4rem);
+        color: var(--dim);
+        max-width: 640px;
+        margin: 1rem auto 0;
+      }
+      .hook {
+        margin-top: 1.4rem;
+        font-size: 1.15rem;
+        color: var(--text);
+      }
+      .hook b { color: var(--gold); }
+
+      .btns { display: flex; gap: 0.9rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.9rem 1.7rem; border-radius: 14px; font-weight: 600;
+        text-decoration: none; font-size: 1rem; border: 1px solid transparent;
+        transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+      }
+      .btn--primary { background: var(--gradient); color: #fff; box-shadow: 0 8px 30px rgba(168, 85, 247, 0.4); }
+      .btn--primary:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(168, 85, 247, 0.6); }
+      .btn--ghost { background: var(--card); border-color: var(--border); color: var(--text); }
+      .btn--ghost:hover { border-color: var(--violet); transform: translateY(-3px); }
+
+      section { padding: 2.5rem 0; }
+      .shot {
+        width: 100%; border-radius: 18px; border: 1px solid var(--border);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); display: block; margin: 0 auto;
+      }
+      .shot-cap { text-align: center; color: var(--dim); font-size: 0.92rem; margin-top: 0.7rem; }
+
+      h2 {
+        font-size: clamp(1.6rem, 4vw, 2.3rem); font-weight: 800; text-align: center; margin-bottom: 1.6rem;
+      }
+      .grad { background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; }
+      .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+        padding: 1.6rem; backdrop-filter: blur(12px); transition: transform 0.3s, border-color 0.3s;
+      }
+      .card:hover { transform: translateY(-6px); border-color: var(--violet); }
+      .card .ico { font-size: 2rem; margin-bottom: 0.6rem; }
+      .card h3 { font-size: 1.15rem; margin-bottom: 0.4rem; }
+      .card p { color: var(--dim); font-size: 0.95rem; }
+
+      .how { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: clamp(1.5rem, 4vw, 2.4rem); }
+      .how pre {
+        background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: 12px;
+        padding: 1rem 1.2rem; overflow-x: auto; color: var(--cyan); font-size: 0.86rem; line-height: 1.5;
+      }
+      .learn { font-family: 'Consolas', monospace; font-size: 0.82rem; color: var(--dim); margin-top: 1rem; white-space: pre; overflow-x: auto; }
+      .learn .peak { color: var(--gold); }
+
+      .install code {
+        display: block; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border);
+        border-radius: 12px; padding: 1rem 1.2rem; font-family: 'Consolas', monospace;
+        color: var(--cyan); font-size: 0.9rem; overflow-x: auto; margin-top: 0.8rem;
+      }
+
+      footer { text-align: center; padding: 3rem 0; color: var(--dim); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+      a.inline { color: var(--cyan); }
+    </style>
+  </head>
+  <body>
+    <header class="wrap">
+      <h1 class="logo">◈ NeuroFlap</h1>
+      <p class="tagline">Eine selbstlernende KI wird per <b>Neuroevolution</b> übermenschlich gut in Flappy Bird.</p>
+      <p class="hook"><i>Nobody taught it to fly.</i> <b>It evolved.</b></p>
+      <div class="btns">
+        <a class="btn btn--primary" href="https://github.com/matti24/Hacked-FlappyBird">★ Auf GitHub ansehen</a>
+        <a class="btn btn--ghost" href="#start">▶ Selbst starten</a>
+      </div>
+    </header>
+
+    <section class="wrap">
+      <img class="shot" src="preview.png" alt="NeuroFlap KI-Modus: Vogel-Schwarm, neuronales Netz und Fitness-Graph" />
+      <p class="shot-cap">KI-Modus: 150 Vögel lernen gleichzeitig – mit Live-Visualisierung des besten Gehirns und der Lernkurve.</p>
+    </section>
+
+    <section class="wrap">
+      <h2>Warum das <span class="grad">cool</span> ist</h2>
+      <div class="grid">
+        <div class="card"><div class="ico">🧠</div><h3>KI from scratch</h3><p>Neuronales Netz und genetischer Algorithmus komplett selbst gebaut – keine ML-Bibliothek.</p></div>
+        <div class="card"><div class="ico">🧬</div><h3>Neuroevolution</h3><p>Selektion, Crossover, Mutation. Nach wenigen Generationen fliegt die KI praktisch endlos.</p></div>
+        <div class="card"><div class="ico">🕹️</div><h3>Selbst spielen</h3><p>Wechsle in den Mensch-Modus und tritt direkt gegen den KI-Bestwert an. Schaffst du mehr?</p></div>
+        <div class="card"><div class="ico">📈</div><h3>Steigende Schwierigkeit</h3><p>Lücken werden enger, Tempo schneller – und die KI meistert es trotzdem.</p></div>
+      </div>
+    </section>
+
+    <section class="wrap">
+      <img class="shot" src="preview_human.png" alt="NeuroFlap Mensch-Modus: selbst spielen und gegen die KI antreten" />
+      <p class="shot-cap">Mensch-Modus: Spiel selbst und vergleiche deinen Score direkt mit dem der KI.</p>
+    </section>
+
+    <section class="wrap">
+      <h2>Wie die KI <span class="grad">lernt</span></h2>
+      <div class="how">
+        <p style="color: var(--dim)">Jeder Vogel wird von einem eigenen kleinen neuronalen Netz gesteuert. Wer weiter kommt, gibt seine „Gene" an die nächste Generation weiter – so wird die Population Runde um Runde besser:</p>
+        <div class="learn">Generation  1: bester Score  2
+Generation  6: bester Score  4
+Generation  7: bester Score 10
+<span class="peak">Generation  8: bester Score 48   ← Durchbruch!</span></div>
+      </div>
+    </section>
+
+    <section class="wrap install" id="start">
+      <h2>Selbst <span class="grad">starten</span></h2>
+      <div class="how">
+        <p style="color: var(--dim)">Das Spiel läuft als native Python-App (Python 3.10+). In wenigen Sekunden startklar:</p>
+        <div class="install">
+          <code>git clone https://github.com/matti24/Hacked-FlappyBird.git
+cd Hacked-FlappyBird
+pip install -r requirements.txt
+python main.py</code>
+        </div>
+        <p style="color: var(--dim); margin-top: 1rem;">Tipp: Drück <b style="color:var(--text)">5</b> für 30× Tempo und sieh der KI beim Lernen im Zeitraffer zu.</p>
+      </div>
+    </section>
+
+    <footer class="wrap">
+      <p>Gebaut mit Python &amp; pygame · neuronales Netz + genetischer Algorithmus from scratch</p>
+      <p style="margin-top:0.5rem"><a class="inline" href="https://github.com/matti24/Hacked-FlappyBird">github.com/matti24/Hacked-FlappyBird</a></p>
+    </footer>
+  </body>
+</html>
