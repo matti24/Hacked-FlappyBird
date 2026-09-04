@@ -77,7 +77,7 @@ So verbessert sich die Population über die Generationen – ganz ohne Backpropa
 ## Installation & Start
 
 ```bash
-git clone <DEIN-REPO-URL>
+git clone https://github.com/matti24/Hacked-FlappyBird.git
 cd neuroflap
 
 python -m venv .venv
