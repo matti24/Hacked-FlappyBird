@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import math
 import random
+import sys
 
 import pygame
 
 from . import config
+
+
+def _make_font(size: int, bold: bool = False) -> "pygame.font.Font":
+    # Im Browser (pygbag/WASM) gibt es keine Systemfonts -> eingebaute Font nutzen.
+    if sys.platform == "emscripten":
+        return pygame.font.Font(None, size + 4)
+    return pygame.font.SysFont("consolas", size, bold=bold)
 
 
 class Renderer:
@@ -16,11 +24,11 @@ class Renderer:
         self.screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
         pygame.display.set_caption("NeuroFlap – KI lernt fliegen")
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("consolas", 18)
-        self.font_small = pygame.font.SysFont("consolas", 15)
-        self.font_big = pygame.font.SysFont("consolas", 30, bold=True)
-        self.font_huge = pygame.font.SysFont("consolas", 54, bold=True)
-        self.font_label = pygame.font.SysFont("consolas", 13)
+        self.font = _make_font(18)
+        self.font_small = _make_font(15)
+        self.font_big = _make_font(30, bold=True)
+        self.font_huge = _make_font(54, bold=True)
+        self.font_label = _make_font(13)
 
         self._bg = self._make_gradient()
 

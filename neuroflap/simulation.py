@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import random
 
+import pygame
+
 from . import config
 from .bird import Bird
 from .pipe import Pipe
@@ -187,8 +189,10 @@ class Simulation:
 # ----------------------------------------------------------------------
 # Hauptschleife
 # ----------------------------------------------------------------------
-def main() -> None:
-    import pygame
+async def main() -> None:
+    import asyncio
+
+    pygame.init()  # pygbag/WASM: Subsysteme + Konstanten verfügbar machen
 
     from .renderer import Renderer
 
@@ -239,5 +243,6 @@ def main() -> None:
 
         renderer.render(sim, speed, active)
         renderer.clock.tick(config.FPS)
+        await asyncio.sleep(0)  # Kontrolle an den Browser zurückgeben (pygbag)
 
     pygame.quit()

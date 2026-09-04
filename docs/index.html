@@ -1,182 +1,438 @@
-<!DOCTYPE html>
-<html lang="de">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NeuroFlap – Eine KI lernt Flappy Bird</title>
-    <meta name="description" content="Eine selbstlernende KI wird per Neuroevolution übermenschlich gut in Flappy Bird – neuronales Netz & genetischer Algorithmus from scratch." />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧠%3C/text%3E%3C/svg%3E" />
+<html lang="en-us"><script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
+
+print("""
+Loading hellotom from hellotom.apk
+    Pygbag Version : 0.9.3
+    Template Version : 0.9.3
+    Python  : 3.12
+    CDN URL : https://pygame-web.github.io/cdn/0.9.3/
+    Screen  : 1280x720
+    Title   : hellotom
+    Folder  : hellotom
+    Authors : pgw
+    SPDX-License-Identifier: cookiecutter.spdx
+
+""")
+
+import sys
+import asyncio
+import platform
+import json
+from pathlib import Path
+
+# do not rename
+async def custom_site():
+    import embed
+    platform.document.body.style.background = "#7f7f7f"
+
+    platform.window.transfer.hidden = true
+    platform.window.canvas.style.visibility = "visible"
+
+
+    bundle = "hellotom"
+
+    # the C or js loader could do that but be explicit.
+    appdir = Path(f"/data/data/{bundle}") # /data/data/hellotom
+    appdir.mkdir()
+
+
+    # unpack filesystem from compressed archive into work dir
+    if platform.window.location.host.find('.itch.zone')>0:
+        import zipfile
+        async with platform.fopen("hellotom.apk", "rb") as archive:
+            with zipfile.ZipFile(archive) as zip_ref:
+                zip_ref.extractall(appdir.as_posix())
+    else:
+        import tarfile
+        async with platform.fopen("hellotom.tar.gz", "rb") as archive:
+            tar = tarfile.open(fileobj=archive, mode="r:gz")
+            tar.extractall(path=appdir.as_posix(), filter='tar')
+            tar.close()
+
+    # preloader will change to work dir and prepend it to sys.path
+    platform.run_main(PyConfig, loaderhome= appdir / "assets", loadermain=None)
+
+
+    # wait preloading complete : that includes images and wasm compilation of bundled modules
+    while embed.counter()<0:
+        await asyncio.sleep(.1)
+
+    main = appdir / "assets" / "main.py"
+
+    # TODO: test for window.webkitAudioContext and block aio loop until gesture if accessing media manager play
+    # before a gesture is recorded ( touch or click )
+
+    # test/wait user media interaction
+    if not platform.window.MM.UME:
+
+        # now that apk is mounted we have access to font cache
+        # but we need to fill __file__ that is not yet set
+        __import__(__name__).__file__ = main
+
+        # now make a prompt
+        msg  = "Ready to start ! Please click/touch page"
+        platform.window.infobox.innerText = msg
+        print("\n"*4, f"    * Waiting for media user engagement. {msg} *" , "\n"*4)
+
+        while not platform.window.MM.UME:
+            await asyncio.sleep(.1)
+
+    # start async top level machinery if not started and add a console in any case if requested.
+    await TopLevel_async_handler.start_toplevel(platform.shell, console=window.python.config.debug)
+
+    # now that apk is mounted we have access to font cache
+    # but we need to fill __file__/__name__ that are not yet set
+    __import__(__name__).__file__ = main
+
+
+    def ui_callback(pkg):
+        platform.window.infobox.innerText = f"installing {pkg}"
+
+    await shell.source(main, callback=ui_callback)
+
+    # if you don't reach that step
+    # your main.py has an infinite sync loop somewhere !
+
+    platform.window.infobox.style.display = "none"
+    platform.window.config.gui_divider = 1
+    platform.window.window_resize()
+    print("default.tmpl: done")
+
+    shell.interactive()
+
+asyncio.run( custom_site() )
+
+
+
+
+
+
+
+
+
+
+
+
+# BEGIN BLOCK
+#
+# now this is the html part you can (and should) customize
+# It is not mandatory : pygame-script when it reads the first line (also called
+# shebang ) of above code create absolute minimal widget set
+# required for running with default rules
+#
+# do not alter that comment block it is separating python code from html code
+# =============================================================================
+# --></script><head><!--
+//=============================================================================
+//
+//
+//
+//
+//
+//
+//
+
+    {%- if cookiecutter.comment != "" -%}
+{{cookiecutter.comment}}
+    {% endif %}
+
+--><script type="application/javascript">
+// END BLOCK
+
+
+
+// this dict is available under PyConfig.config from __main__
+
+config = {
+    xtermjs : "1" ,
+    _sdl2 : "canvas",
+    user_canvas : 0,
+    user_canvas_managed : 0,
+    gui_divider : 2,
+    ume_block : 1,
+    can_close : 0,
+    archive : "hellotom",
+    gui_debug : 2,
+    cdn : "https://pygame-web.github.io/cdn/0.9.3/",
+    autorun : 0,
+    PYBUILD : "3.12",
+    fb_ar   :  1.77,
+    fb_width : "1280",
+    fb_height : "720"
+}
+
+function show_infobox() {
+    infobox.style.display = "block";
+
+    // Measure box
+    const w = infobox.offsetWidth;
+    const h = infobox.offsetHeight;
+
+    // Center in viewport
+    const left = (window.innerWidth - w) / 2;
+    const top = (window.innerHeight - h) / 2;
+
+    infobox.style.left = left + "px";
+    infobox.style.top = top + "px";
+}
+
+</script>
+
+    <title>hellotom</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="height=device-height, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+
+
+    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+
     <style>
-      :root {
-        --bg: #05010f;
-        --text: #eef0ff;
-        --dim: #9aa0c3;
-        --violet: #a855f7;
-        --cyan: #06b6d4;
-        --pink: #ec4899;
-        --gold: #ffd65a;
-        --card: rgba(255, 255, 255, 0.05);
-        --border: rgba(255, 255, 255, 0.12);
-        --gradient: linear-gradient(135deg, #a855f7 0%, #06b6d4 50%, #ec4899 100%);
-        --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      }
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body {
-        font-family: var(--font);
-        background: var(--bg);
-        color: var(--text);
-        line-height: 1.6;
-        overflow-x: hidden;
-      }
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        background:
-          radial-gradient(circle at 20% 15%, rgba(124, 58, 237, 0.22), transparent 42%),
-          radial-gradient(circle at 82% 70%, rgba(6, 182, 212, 0.16), transparent 42%);
-        z-index: -1;
-        pointer-events: none;
-      }
-      .wrap { max-width: 960px; margin: 0 auto; padding: 0 1.5rem; }
+        #status {
+            display: inline-block;
+            vertical-align: top;
+            margin-top: 20px;
+            margin-left: 30px;
+            font-weight: bold;
+            color: rgb(120, 120, 120);
+        }
 
-      header { text-align: center; padding: clamp(3rem, 10vh, 6rem) 0 2rem; }
-      .logo {
-        font-size: clamp(2.6rem, 9vw, 5rem);
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        background: var(--gradient);
-        background-size: 200% auto;
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        animation: shimmer 5s linear infinite;
-      }
-      @keyframes shimmer { to { background-position: 200% center; } }
-      .tagline {
-        font-size: clamp(1.05rem, 2.6vw, 1.4rem);
-        color: var(--dim);
-        max-width: 640px;
-        margin: 1rem auto 0;
-      }
-      .hook {
-        margin-top: 1.4rem;
-        font-size: 1.15rem;
-        color: var(--text);
-      }
-      .hook b { color: var(--gold); }
+        #progress {
+            height: 20px;
+            width: 300px;
+        }
 
-      .btns { display: flex; gap: 0.9rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
-      .btn {
-        display: inline-flex; align-items: center; gap: 0.5rem;
-        padding: 0.9rem 1.7rem; border-radius: 14px; font-weight: 600;
-        text-decoration: none; font-size: 1rem; border: 1px solid transparent;
-        transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
-      }
-      .btn--primary { background: var(--gradient); color: #fff; box-shadow: 0 8px 30px rgba(168, 85, 247, 0.4); }
-      .btn--primary:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(168, 85, 247, 0.6); }
-      .btn--ghost { background: var(--card); border-color: var(--border); color: var(--text); }
-      .btn--ghost:hover { border-color: var(--violet); transform: translateY(-3px); }
+        #infobox {
+            position: fixed; /* center relative to viewport */
+            background: green;
+            color: blue;
+            font-weight: bold;
+            padding: 12px 24px;
+ /*           display: none; */
+            z-index: 999999;
+        }
+        div.emscripten { text-align: center; }
+        div.emscripten_border { border: 1px solid black; }
+        div.thick_border { border: 4px solid black; }
 
-      section { padding: 2.5rem 0; }
-      .shot {
-        width: 100%; border-radius: 18px; border: 1px solid var(--border);
-        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); display: block; margin: 0 auto;
-      }
-      .shot-cap { text-align: center; color: var(--dim); font-size: 0.92rem; margin-top: 0.7rem; }
+        /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
+        /* average size of droid screen 470dp x 320dp  */
+        canvas.emscripten {
+            border: 0px none;
+            background-color: transparent;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
 
-      h2 {
-        font-size: clamp(1.6rem, 4vw, 2.3rem); font-weight: 800; text-align: center; margin-bottom: 1.6rem;
-      }
-      .grad { background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+            padding: 0;
+            margin: 0 auto;
 
-      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; }
-      .card {
-        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
-        padding: 1.6rem; backdrop-filter: blur(12px); transition: transform 0.3s, border-color 0.3s;
-      }
-      .card:hover { transform: translateY(-6px); border-color: var(--violet); }
-      .card .ico { font-size: 2rem; margin-bottom: 0.6rem; }
-      .card h3 { font-size: 1.15rem; margin-bottom: 0.4rem; }
-      .card p { color: var(--dim); font-size: 0.95rem; }
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
 
-      .how { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: clamp(1.5rem, 4vw, 2.4rem); }
-      .how pre {
-        background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: 12px;
-        padding: 1rem 1.2rem; overflow-x: auto; color: var(--cyan); font-size: 0.86rem; line-height: 1.5;
-      }
-      .learn { font-family: 'Consolas', monospace; font-size: 0.82rem; color: var(--dim); margin-top: 1rem; white-space: pre; overflow-x: auto; }
-      .learn .peak { color: var(--gold); }
+        body {
+            font-family: arial;
+            margin: 0;
+            padding: none;
+            background-color:powderblue;
+        }
 
-      .install code {
-        display: block; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border);
-        border-radius: 12px; padding: 1rem 1.2rem; font-family: 'Consolas', monospace;
-        color: var(--cyan); font-size: 0.9rem; overflow-x: auto; margin-top: 0.8rem;
-      }
+        .topright{
+           position:absolute;
+           top:0px;
+           right:0px;
+        }
 
-      footer { text-align: center; padding: 3rem 0; color: var(--dim); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2rem; }
-      a.inline { color: var(--cyan); }
+        .bottomright {
+            position:absolute;
+            top: 40%;
+            right: 0px;
+        }
+
+        .center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .trinfo{
+           position: relative;
+           right: 0px;
+           border: 1px solid black;
+        }
+
+        .framed{
+           position: relative;
+           top: 150px;
+           right: 10px;
+           border: 1px solid black;
+        }
     </style>
-  </head>
-  <body>
-    <header class="wrap">
-      <h1 class="logo">◈ NeuroFlap</h1>
-      <p class="tagline">Eine selbstlernende KI wird per <b>Neuroevolution</b> übermenschlich gut in Flappy Bird.</p>
-      <p class="hook"><i>Nobody taught it to fly.</i> <b>It evolved.</b></p>
-      <div class="btns">
-        <a class="btn btn--primary" href="https://github.com/matti24/Hacked-FlappyBird">★ Auf GitHub ansehen</a>
-        <a class="btn btn--ghost" href="#start">▶ Selbst starten</a>
-      </div>
-    </header>
 
-    <section class="wrap">
-      <img class="shot" src="preview.png" alt="NeuroFlap KI-Modus: Vogel-Schwarm, neuronales Netz und Fitness-Graph" />
-      <p class="shot-cap">KI-Modus: 150 Vögel lernen gleichzeitig – mit Live-Visualisierung des besten Gehirns und der Lernkurve.</p>
-    </section>
+    <script>
+/*
+        if (navigator.serviceWorker)
+            navigator.serviceWorker.register("https://pygame-web.github.io/cdn/0.9.3/pygbag0.9.3.js")
+        else
+            console.warn("Service workers not supported")
+*/
+    </script>
 
-    <section class="wrap">
-      <h2>Warum das <span class="grad">cool</span> ist</h2>
-      <div class="grid">
-        <div class="card"><div class="ico">🧠</div><h3>KI from scratch</h3><p>Neuronales Netz und genetischer Algorithmus komplett selbst gebaut – keine ML-Bibliothek.</p></div>
-        <div class="card"><div class="ico">🧬</div><h3>Neuroevolution</h3><p>Selektion, Crossover, Mutation. Nach wenigen Generationen fliegt die KI praktisch endlos.</p></div>
-        <div class="card"><div class="ico">🕹️</div><h3>Selbst spielen</h3><p>Wechsle in den Mensch-Modus und tritt direkt gegen den KI-Bestwert an. Schaffst du mehr?</p></div>
-        <div class="card"><div class="ico">📈</div><h3>Steigende Schwierigkeit</h3><p>Lücken werden enger, Tempo schneller – und die KI meistert es trotzdem.</p></div>
-      </div>
-    </section>
+    <script src="https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js"></script>
 
-    <section class="wrap">
-      <img class="shot" src="preview_human.png" alt="NeuroFlap Mensch-Modus: selbst spielen und gegen die KI antreten" />
-      <p class="shot-cap">Mensch-Modus: Spiel selbst und vergleiche deinen Score direkt mit dem der KI.</p>
-    </section>
+</head>
 
-    <section class="wrap">
-      <h2>Wie die KI <span class="grad">lernt</span></h2>
-      <div class="how">
-        <p style="color: var(--dim)">Jeder Vogel wird von einem eigenen kleinen neuronalen Netz gesteuert. Wer weiter kommt, gibt seine „Gene" an die nächste Generation weiter – so wird die Population Runde um Runde besser:</p>
-        <div class="learn">Generation  1: bester Score  2
-Generation  6: bester Score  4
-Generation  7: bester Score 10
-<span class="peak">Generation  8: bester Score 48   ← Durchbruch!</span></div>
-      </div>
-    </section>
+<body>
 
-    <section class="wrap install" id="start">
-      <h2>Selbst <span class="grad">starten</span></h2>
-      <div class="how">
-        <p style="color: var(--dim)">Das Spiel läuft als native Python-App (Python 3.10+). In wenigen Sekunden startklar:</p>
-        <div class="install">
-          <code>git clone https://github.com/matti24/Hacked-FlappyBird.git
-cd Hacked-FlappyBird
-pip install -r requirements.txt
-python main.py</code>
+    <div id="transfer" align=center>
+<!--        <div class="spinner" id='spinner'></div> -->
+        <div class="emscripten" id="status">Downloading...</div>
+        <div class="emscripten">
+            <progress value="0" max="100" id="progress"></progress>
         </div>
-        <p style="color: var(--dim); margin-top: 1rem;">Tipp: Drück <b style="color:var(--text)">5</b> für 30× Tempo und sieh der KI beim Lernen im Zeitraffer zu.</p>
-      </div>
-    </section>
+    </div>
 
-    <footer class="wrap">
-      <p>Gebaut mit Python &amp; pygame · neuronales Netz + genetischer Algorithmus from scratch</p>
-      <p style="margin-top:0.5rem"><a class="inline" href="https://github.com/matti24/Hacked-FlappyBird">github.com/matti24/Hacked-FlappyBird</a></p>
-    </footer>
-  </body>
+
+
+    <canvas class="emscripten" id="canvas"
+width="1px"
+height="1px"
+    oncontextmenu="event.preventDefault()" tabindex=1>
+    </canvas>
+
+    <canvas class="emscripten" id="canvas3d"
+width="1280px"
+height="720px"
+    oncontextmenu="event.preventDefault()" tabindex=1 hidden>
+    </canvas>
+
+    <div id="infobox">Loading, please wait ...</div>
+
+    <div id=html></div>
+
+    <div id=crt  class=bottomright >
+
+        <div id="system" hidden>
+            <div class="button-container">
+                <button id="aiostop" disabled>AIO ⏏︎</button>
+                <button id="aiopaused_true" disabled>AIO ■</button>
+                <button id="aiopaused_false" disabled>AIO ▶</button>
+                <button id="pygame_mixer_music_pause" disabled>Music ■</button>
+            </div>
+
+            <div class="button-container">
+                <div id=load_min>min</div>
+                <div id=load_avg>avg</div>
+                <div id=load_max>max</div>
+              <button id="load_rst" disabled>RESET</button>
+            </div>
+
+            <div id="level">(battery level unknown)</div>
+            <div id="stateBattery">(charging state unknown)</div>
+
+        </div>
+
+        <div id=box class="emscripten_border" hidden=true>
+
+            <div id="info" class="trinfo"></div>
+
+            <iframe id="iframe" class="framed" name="iframe"
+width="470px" height="90%"
+allowtransparency="true"
+style="z-index: 10;"
+style="background: #FFFFFF;"
+frameborder="1"
+                allowfullscreen="true"
+                webkitallowfullscreen="true"
+                msallowfullscreen="true"
+                mozallowfullscreen="true"
+                sandbox="allow-same-origin allow-top-navigation allow-scripts allow-pointer-lock"
+                allow="autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated"
+                src="https://pygame-web.github.io/cdn/0.9.3/empty.html"
+                scrolling="yes">
+            </iframe>
+        </div>
+
+    </div>
+
+
+    <div id="dlg" hidden>
+        <input type="file" id="dlg_multifile" multiple accept="image/*">
+        <label for="dlg_multifile">Select files</label>
+    </div>
+
+    <div id="pyconsole">
+        <div id="terminal" tabIndex=1 align="left"></div>
+    </div>
+
+    <script type="application/javascript">
+
+    globalThis.__canvas_resized = (self, ecw, ech) => {
+        console.warn("TODO: panda3d canvas monitor", self, ecw, ech)
+    }
+
+    async function custom_onload(debug_hidden) {
+        // this is called before anything python is loaded
+        // make your js customization here
+        console.log(__FILE__, "custom_onload")
+
+        pyconsole.hidden = debug_hidden
+        system.hidden = debug_hidden
+        transfer.hidden = debug_hidden
+        info.hidden = debug_hidden
+        box.hidden =  debug_hidden
+
+        show_infobox()
+    }
+
+    function custom_prerun(){
+        // no python main and no (MEMFS + VFS) yet.
+        console.log(__FILE__, "custom_prerun")
+
+    }
+
+    function custom_postrun(){
+        // python main and no VFS filesystem yet.
+        console.log(__FILE__, "custom_postrun")
+
+    }
+
+    function debug() {
+        // allow to gain access to dev tools from js console
+        // but only on desktop. difficult to reach when in iframe
+        python.config.debug = true
+        custom_onload(false)
+        Module.PyRun_SimpleString("shell.uptime()")
+        window_resize()
+    }
+
+    function info_inline(data){
+        document.getElementById("info").innerHTML = data
+    }
+
+    function info_online(url) {
+        // display info about current APK
+        fetch( url /*, options */)
+            .then((response) => response.text())
+            .then((html) => {
+                info_inline(html);
+        })
+        .catch((error) => {
+            console.warn(error);
+        });
+    }
+
+    function frame_online(url) {
+        window.frames["iframe"].location = url;
+    }
+
+    </script>
+
+</body>
 </html>
